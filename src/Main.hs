@@ -4,6 +4,8 @@ import Control.Monad
 
 data TodoCommand = 
             Init 
+               { userLevel :: Bool 
+               }
             | Add 
                { fromFile :: Maybe FilePath 
                , priority :: Maybe Integer
@@ -15,7 +17,17 @@ data TodoCommand =
 
 initMode :: TodoCommand
 initMode = Init 
-            &= help "Init the todo."
+               { userLevel = False  
+                  &= explicit
+                  &= name "for-user"
+                  &= help ("Specifies wether or not this is for the user or the current directory." 
+                            ++ " Current directory is used by default.")
+               }
+            &= help "Initialise the todo."
+            &= details 
+               [ "This function allows you to create a todo list database in either the current directory "
+               ++ "or in a location that is good for the current user."
+               ]
 
 addMode :: TodoCommand
 addMode = Add 
@@ -55,6 +67,6 @@ arguments = cmdArgsMode $
                combinedModes 
                &= help "The Haskell Todo" 
                &= program "htodo" 
-               &= summary "htodo v0.1"
+               &= summary "htodo v0.1 - By Robert Massaioli"
 
 main = cmdArgsRun arguments >>= print
