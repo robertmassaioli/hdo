@@ -47,10 +47,13 @@ Cabal-version:       >=1.2
 
 Executable htodo
   -- .hs or .lhs file containing the Main module.
+  hs-source-dirs: src
   Main-is:             Main.hs
   
   -- Packages needed in order to build this package.
-  Build-depends:       base
+  Build-depends:       
+      base, 
+      cmdargs == 0.6.5
   
   -- Modules not exported by this package.
   -- Other-modules:       
