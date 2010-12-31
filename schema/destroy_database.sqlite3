@@ -1,0 +1,6 @@
+-- deletes all of the databases in the program
+drop table updates;
+drop table items;
+drop table events;
+drop table tags;
+drop table tag_map;

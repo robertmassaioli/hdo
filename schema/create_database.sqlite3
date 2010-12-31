@@ -1,0 +1,42 @@
+-- this table lists all of the updates that have been applied to it
+-- when you are using the latest version of htodo it will just create the database as it should be
+-- and then it will fill this table with all of the updates as though they have already been applied.
+-- That way when you go to upgrade the program again and it looks at this database it just applies
+-- the updates that it cannot see yet.
+create table updates ( 
+   version integer primary key, 
+   description text, 
+   upgradeDate date
+   );
+
+-- This is the primary database of the program. It contains the todo items themselves.
+create table items ( 
+   id integer primary key autoincrement not null, 
+   description text not null, 
+   created_at datetime not null,
+   parent_id references items(id) on delete cascade,
+   priority integer not null
+   );
+
+-- This table records the changes to the todo items.
+create table events (
+   id integer primary key autoincrement not null,
+   event_item integer references items(id) on delete cascade,
+   event_type integer not null,
+   event_change text,
+   occurred_at datetime not null
+   );
+
+-- This table records the tags themselves that the program contains.
+create table tags (
+   id integer primary key autoincrement not null,
+   tag_name text not null
+   );
+
+-- This table records a mapping bettween a todo item and a tag thus meaning that every row in the
+-- table should be unique. It does not make sense for one item to be tagged with the same tag twice.
+create table tag_map (
+   item_id integer references items(id) on delete cascade,
+   tag_id integer references tags(id) on delete cascade
+   );
+

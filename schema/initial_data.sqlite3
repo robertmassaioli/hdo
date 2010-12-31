@@ -1,0 +1,67 @@
+PRAGMA foreign_keys = ON;
+delete from tag_map;
+delete from items;
+delete from tags;
+delete from events;
+delete from updates;
+vacuum;
+
+insert into tags (id, tag_name) values (1, "food");
+insert into tags (id, tag_name) values (2, "database");
+insert into tags (id, tag_name) values (3, "blog");
+insert into tags (id, tag_name) values (4, "haskell");
+insert into tags (id, tag_name) values (5, "interesting");
+insert into tags (id, tag_name) values (6, "expenses");
+insert into tags (id, tag_name) values (7, "computers");
+
+-- Start putting the todo items in the database.
+insert into items (id, description, priority, created_at) values (1, "Make a chicken sandwich.", 1, datetime());
+insert into tag_map (item_id, tag_id) values (1, 1);
+
+insert into items (id, description, priority, created_at) values (2, "Learn how to use HDBC.", 2, datetime());
+insert into tag_map (item_id, tag_id) values (2, 2);
+insert into tag_map (item_id, tag_id) values (2, 4);
+insert into tag_map (item_id, tag_id) values (2, 5);
+insert into tag_map (item_id, tag_id) values (2, 7);
+
+insert into items (id, description, priority, created_at) values (3, "Write a blog post.", 3, datetime());
+insert into tag_map (item_id, tag_id) values (3, 5);
+insert into tag_map (item_id, tag_id) values (3, 7);
+insert into tag_map (item_id, tag_id) values (3, 3);
+
+-- Create children for id 1
+insert into items (id, description, priority, created_at, parent_id) 
+   values (4, "Buy some chicken.", 1, datetime(), 1);
+insert into tag_map (item_id, tag_id) values (4, 1);
+insert into tag_map (item_id, tag_id) values (4, 6);
+
+insert into items (id, description, priority, created_at, parent_id) 
+   values (5, "Buy some bread.", 6, datetime(), 1);
+insert into tag_map (item_id, tag_id) values (5, 1);
+insert into tag_map (item_id, tag_id) values (5, 6);
+
+-- Create children for id 2
+insert into items (id, description, priority, created_at, parent_id) 
+   values (6, "Figure out how all of the different databases hook in.", 3, datetime(), 2);
+insert into tag_map (item_id, tag_id) values (6, 2);
+insert into tag_map (item_id, tag_id) values (6, 5);
+insert into tag_map (item_id, tag_id) values (6, 7);
+
+insert into items (id, description, priority, created_at, parent_id) 
+   values (7, "Write a program that makes use of the library for the greater good.", 3, datetime(), 2);
+insert into tag_map (item_id, tag_id) values (7, 4);
+insert into tag_map (item_id, tag_id) values (7, 5);
+insert into tag_map (item_id, tag_id) values (7, 7);
+
+-- Create children for id 3
+insert into items (id, description, priority, created_at, parent_id) 
+   values (8, "Write a Haskell blog post.", 4, datetime(), 3);
+insert into tag_map (item_id, tag_id) values (8, 3);
+insert into tag_map (item_id, tag_id) values (8, 4);
+insert into tag_map (item_id, tag_id) values (8, 5);
+insert into tag_map (item_id, tag_id) values (8, 7);
+
+insert into items (id, description, priority, created_at, parent_id) 
+   values (9, "Write a blog post that gets people talking.", 1, datetime(), 3);
+insert into tag_map (item_id, tag_id) values (9, 3);
+insert into tag_map (item_id, tag_id) values (9, 5);
