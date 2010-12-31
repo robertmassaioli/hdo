@@ -6,6 +6,7 @@ supports (or will support) the following features:
  - Easy Command Line Interface (Not Implemented Yet)
  - Single Database Storage (Not Implemented Yet)
  - Taggable todo items. (Not Implemented Yet)
+ - Parent-Child tree based structures for todo items. (Not Implemented Yet)
  - Records changes in the state of the todo items. (Not Implemented Yet)
  - Database upgrades should be easy for the user (Not Implemented Yet)
 
