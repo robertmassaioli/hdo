@@ -52,8 +52,10 @@ Executable htodo
   
   -- Packages needed in order to build this package.
   Build-depends:       
-      base, 
-      cmdargs == 0.6.5
+      base 
+      , cmdargs == 0.6.5
+      , parsec == 3.1.0
+
   
   -- Modules not exported by this package.
   -- Other-modules:       
