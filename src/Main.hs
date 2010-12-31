@@ -2,8 +2,14 @@
 import System.Console.CmdArgs.Implicit
 import Control.Monad
 
-data TodoCommand = 
-            Init 
+data TodoCommand 
+            = Show
+               { showEntireHierarchy :: Bool
+               , showDone :: Bool
+               , showUsingFilter :: Maybe String
+               , showFilterExtra :: Maybe String
+               }
+            | Init 
                { userLevel :: Bool 
                }
             | Add 
@@ -14,6 +20,33 @@ data TodoCommand =
             | Edit { editIds :: [Integer] }
             | Help
             deriving(Eq, Show, Data, Typeable)
+
+showMode :: TodoCommand
+showMode = Show 
+               { showEntireHierarchy = def 
+                  &= explicit
+                  &= name "a" &= name "all"
+                  &= help "Show the entire hierarchy of the todo list items."
+               , showDone = def
+                  &= explicit
+                  &= name "d" &= name "done"
+                  &= help "Also show the items that are done."
+               , showUsingFilter = def
+                  &= explicit
+                  &= name "filter"
+                  &= typ "f1,f2,f3,..."
+                  &= help ("Sometimes the normal command line options are not enough; this allows you to "
+                     ++ "specify a filter. The default is obviously to filter on nothing and thus show "
+                     ++ "everything.")
+               , showFilterExtra = def
+                  &= args
+                  &= typ "filters..."
+               }
+            &= help "Show todo items from the database."
+            &= details
+            [ "You are eventually going to want to display items from the database and this is what will "
+            ++ "allow you to do exactly that. This is the default mode that htodo runs in."
+            ]
 
 initMode :: TodoCommand
 initMode = Init 
@@ -72,7 +105,8 @@ editMode = Edit {
 
 combinedModes :: TodoCommand
 combinedModes = modes 
-   [ initMode
+   [ showMode &= auto
+   , initMode
    , addMode
    , doneMode
    , editMode
