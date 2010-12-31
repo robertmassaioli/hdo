@@ -18,10 +18,13 @@ htodo can be installed pretty easily. Simply check out the code and:
     cabal install
 
 And that is all that there is to it. Any configuration or setup will be asked of you inside the
-program itself.
+program itself. (Also just make sure that ~/.cabal/bin, or its windows equivalent, is in your path.)
 
 ## Usage Instructions
 
-TODO Add the usage instructions when you have a program to use. Essentially there should be addition,
-marking-as-done, editing, tagging, parenting and the works. Note that every todo item will get its
-own unique ID.
+For now all of the instructions that are avaliable can be gathered via the command line --help
+option. For the general overview of what this program does please just do the following:
+
+    $ htodo --help=one
+
+And it will print out all of your options.
