@@ -2,6 +2,11 @@
 import System.Console.CmdArgs.Implicit
 import Control.Monad
 
+import Data.Maybe (catMaybes)
+import Data.List (intersperse)
+
+import Text.ParserCombinators.Parsec
+
 data TodoCommand 
             = Show
                { showEntireHierarchy :: Bool
@@ -120,4 +125,107 @@ arguments = cmdArgsMode $
                &= program "htodo" 
                &= summary "htodo v0.1 - By Robert Massaioli"
 
-main = cmdArgsRun arguments >>= print
+main = do
+   command <- cmdArgsRun arguments
+   print command
+   executeCommand command
+
+executeCommand :: TodoCommand -> IO ()
+executeCommand x@(Show {}) = executeShowCommand x
+executeCommand x@(Init {}) = executeShowCommand x
+executeCommand x@(Add {}) = executeShowCommand x
+executeCommand x@(Edit {}) = executeShowCommand x
+executeCommand x@(Done {}) = executeShowCommand x
+
+data FilterType 
+   = FilterTypeAdd 
+   | FilterTypeEquals 
+   | FilterTypeRemove
+   | FilterTypeDefault
+   deriving(Eq, Show)
+
+data Filter 
+   = FilterAll 
+      { filterType :: FilterType 
+      }
+   | FilterChildren
+      { filterType :: FilterType 
+      }
+   | FilterDone
+      { filterType :: FilterType 
+      }
+   | FilterPriority
+      { filterType :: FilterType 
+      , filterPriority :: Integer
+      }
+   | FilterIndex
+      { filterType :: FilterType 
+      , filterRange :: [Range Integer]
+      }
+   | FilterRegex
+      { regexString :: String
+      }
+   deriving(Eq, Show)
+
+data Range a
+   = SingletonRange a
+   | SpanRange a a
+   deriving(Eq, Show)
+
+executeShowCommand :: TodoCommand -> IO ()
+executeShowCommand (Show sa sd f_one f_two) = do
+   putStrLn "Should be showing stuff now."
+   print filter_str
+   print $ parse parseFilters "(unknown)" filter_str
+   where
+      filter_str = concat . intersperse "," . catMaybes $ [f_one, f_two]
+
+      split :: String -> [String]
+      split [] = []
+      split xs = takeWhile (/= ',') xs : case dropWhile (/= ',') xs of
+                                             [] -> []
+                                             x -> split . tail $ x
+
+parseFilters :: CharParser st [Filter]
+parseFilters = sepBy parseFilter (char ',')
+
+parseFilter :: CharParser st Filter
+parseFilter 
+   = try (templateFilter "all" FilterAll)
+   <|> try (templateFilter "children" FilterChildren)
+   <|> try (templateFilter "done" FilterDone)
+   <|> indexRanges
+   where
+      templateFilter :: String -> (FilterType -> Filter) -> CharParser st Filter
+      templateFilter name constructor = do
+         ft <- parseFilterType
+         string name
+         return $ constructor ft
+
+      indexRanges :: CharParser st Filter
+      indexRanges = do
+         ft <- parseFilterType
+         ranges <- sepBy indexRange (char '.')
+         return $ FilterIndex { filterType = ft, filterRange = ranges }
+         where
+            indexRange :: CharParser st (Range Integer)
+            indexRange = do
+               first <- many1 digit
+               decide first
+
+            decide :: String -> CharParser st (Range Integer)
+            decide first = 
+               (do
+                  char '-'
+                  second <- many1 digit 
+                  return (SpanRange (read first) (read second))
+               )
+               <|> return (SingletonRange (read first))
+
+      parseFilterType :: CharParser st FilterType
+      parseFilterType 
+         = (char '+' >> return FilterTypeAdd)
+         <|> (char '-' >> return FilterTypeRemove)
+         <|> (char '=' >> return FilterTypeEquals)
+         <|> return FilterTypeDefault
+

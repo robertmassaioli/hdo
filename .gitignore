@@ -4,3 +4,6 @@
 
 # Compile dir
 dist
+
+# database files (will want to remove this eventually)
+*.db
