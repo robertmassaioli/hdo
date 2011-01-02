@@ -53,7 +53,7 @@ parseFilter
    = try (templateFilter "all" FilterAll)
    <|> try (templateFilter "children" FilterChildren)
    <|> try (templateFilter "done" FilterDone)
-   <|> try (indexRanges)
+   <|> try indexRanges
    where
       templateFilter :: String -> (FilterType -> Filter) -> CharParser st Filter
       templateFilter name constructor = do
@@ -65,7 +65,7 @@ parseFilter
       indexRanges = do
          ft <- parseFilterType
          ranges <- sepBy1 indexRange (char '.')
-         return $ FilterIndex { filterType = ft, filterRange = ranges }
+         return FilterIndex { filterType = ft, filterRange = ranges }
          where
             indexRange :: CharParser st (Range Integer)
             indexRange = do

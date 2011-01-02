@@ -37,7 +37,7 @@ displayItems = mapM_ (displayItemHelper 0)
    where
       displayItemHelper :: Int -> Item -> IO ()
       displayItemHelper level item = do
-         putStr $ take (level * 3 + 1) $ repeat ' '
+         putStr $ replicate (level * 3 + 1) ' '
          putStr $ show (itemId item) ++ ". "
          putStrLn $ itemDescription item
          mapM_ (displayItemHelper (level + 1)) (itemChildren item)
@@ -49,8 +49,8 @@ getTodoItems conn = do
    where
       createChild :: [SqlValue] -> IO Item
       createChild [iid, ide, ica, _, ipr] = do
-         let this_id = (fromSql iid) :: Integer
-         children <- mapM createChild =<< quickQuery' conn ("select i.* from items i where i.parent_id = " ++ (show this_id)) []
+         let this_id = fromSql iid :: Integer
+         children <- mapM createChild =<< quickQuery' conn ("select i.* from items i where i.parent_id = " ++ show this_id) []
          return Item
                   { itemId = fromSql iid
                   , itemDescription = fromSql ide
