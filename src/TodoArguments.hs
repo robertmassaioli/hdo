@@ -32,7 +32,7 @@ getCommandInput = cmdArgsRun todoArguments
 todoArguments :: Mode (CmdArgs TodoCommand)
 todoArguments = cmdArgsMode $ 
                combinedModes 
-               &= help "The Haskell Todo" 
+               &= help "The program who's to do list is to do your todo's." 
                &= helpArg [explicit, name "h", name "help"]
                &= program "htodo" 
                &= summary "htodo v0.1 - By Robert Massaioli"
@@ -81,7 +81,7 @@ initMode = Init
                   &= help ("Specifies wether or not this is for the user or the current directory." 
                             ++ " Current directory is used by default.")
                }
-            &= help "Initialise the todo."
+            &= help "Initialise the todo database and config."
             &= details 
                [ "This function allows you to create a todo list database in either the current directory "
                ++ "or in a location that is good for the current user."
