@@ -1,3 +1,4 @@
+PRAGMA foreign_keys = ON;
 -- deletes all of the databases in the program
 drop table updates;
 drop table items;

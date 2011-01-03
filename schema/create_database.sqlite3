@@ -1,3 +1,5 @@
+PRAGMA foreign_keys = ON;
+
 -- this table lists all of the updates that have been applied to it
 -- when you are using the latest version of htodo it will just create the database as it should be
 -- and then it will fill this table with all of the updates as though they have already been applied.

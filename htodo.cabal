@@ -53,12 +53,13 @@ Executable htodo
   -- Packages needed in order to build this package.
   Build-depends:       
       base 
+      , directory == 1.1.0.0
       , time >= 1.2
       , cmdargs == 0.6.5
       , parsec == 3.1.0
       , HDBC == 2.2.6.1
       , HDBC-sqlite3 == 2.3.1.0
-
+      , mtl == 1.1.0.2
   
   -- Modules not exported by this package.
   -- Other-modules:       
