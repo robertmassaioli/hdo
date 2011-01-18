@@ -88,7 +88,7 @@ executeShowCommand config showFlags = do
       Just x -> print $ separateCommas x
    unless (filter_str == "") $ print (getFilters filter_str)
    conn <- getDatabaseConnection
-   getTodoItems conn >>= displayItems
+   getTodoItems conn >>= (\s -> print s >> displayItems s)
    disconnect conn
    where
       filter_str = concat . intersperse "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
@@ -111,7 +111,8 @@ getTodoItems conn = do
       createChild :: [SqlValue] -> IO Item
       createChild [iid, ide, ica, _, ipr] = do
          let this_id = fromSql iid :: Integer
-         children <- mapM createChild =<< quickQuery' conn ("select i.* from items i where i.parent_id = " ++ show this_id) []
+         children <- mapM createChild =<< quickQuery' conn "select i.* from items i where i.parent_id = ?" [toSql this_id]
+         putStrLn $ show (toSql this_id)
          return Item
                   { itemId = fromSql iid
                   , itemDescription = fromSql ide
@@ -136,22 +137,22 @@ executeInitCommand :: Config -> TodoCommand -> IO ()
 executeInitCommand config showFlags = undefined
 
 executeAddCommand :: Config -> TodoCommand -> IO ()
-executeAddCommand config showFlags = do
+executeAddCommand config addFlags = do
    (comment, pri, tags) <- getData
    if (null comment) || (null pri)
       then
          putStrLn "Need a comment and priority to add a new item."
       else do
          conn <- getDatabaseConnection
-         run conn addInsertion [toSql comment, SqlNull, toSql pri]
+         run conn addInsertion [toSql comment, toSql (parent addFlags), toSql pri]
          itemId <- getLastId conn
-         print itemId
          unless (null tags) $ do
             tagIds <- findOrCreateTags conn tags
             insertStatement <- prepare conn "INSERT INTO tag_map (item_id, tag_id) VALUES (?,?)"
             mapM_ (execute insertStatement) [[toSql itemId, tag] | tag <- map toSql tagIds]
          commit conn
          disconnect conn
+         putStrLn $ "Added item " ++ show itemId ++ " successfully."
    where 
       findOrCreateTags :: (IConnection c) => c -> [String] -> IO [Integer]
       findOrCreateTags conn = mapM findOrCreateTag

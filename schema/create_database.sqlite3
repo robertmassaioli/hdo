@@ -16,17 +16,19 @@ create table items (
    id integer primary key autoincrement not null, 
    description text not null, 
    created_at datetime not null,
-   parent_id references items(id) on delete cascade,
-   priority integer not null
+   parent_id integer,
+   priority integer not null,
+   FOREIGN KEY(parent_id) references items(id) on delete cascade
    );
 
 -- This table records the changes to the todo items.
 create table events (
    id integer primary key autoincrement not null,
-   event_item integer references items(id) on delete cascade,
+   event_item integer, 
    event_type integer not null,
    event_change text,
-   occurred_at datetime not null
+   occurred_at datetime not null,
+   FOREIGN KEY(event_item) references items(id) on delete cascade
    );
 
 -- This table records the tags themselves that the program contains.
@@ -38,7 +40,9 @@ create table tags (
 -- This table records a mapping bettween a todo item and a tag thus meaning that every row in the
 -- table should be unique. It does not make sense for one item to be tagged with the same tag twice.
 create table tag_map (
-   item_id integer references items(id) on delete cascade,
-   tag_id integer references tags(id) on delete cascade
+   item_id integer, 
+   tag_id integer, 
+   FOREIGN KEY(item_id) references items(id) on delete cascade,
+   FOREIGN KEY(tag_id) references tags(id) on delete cascade
    );
 
