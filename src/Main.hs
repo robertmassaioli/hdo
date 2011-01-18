@@ -137,20 +137,56 @@ executeInitCommand config showFlags = undefined
 
 executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config showFlags = do
-   putStrFlush "comment> "
-   comment <- getLine
-   if (null comment) 
-      then 
-         putStrLn "Need a comment to continue."
+   (comment, pri, tags) <- getData
+   if (null comment) || (null pri)
+      then
+         putStrLn "Need a comment and priority to add a new item."
       else do
-         putStrFlush "priority> "
-         priority <- getLine
-         putStrFlush "tags> "
-         tags <- getLine
          conn <- getDatabaseConnection
-         run conn addInsertion [toSql comment, SqlNull, toSql priority]
-         commit conn >> disconnect conn
+         run conn addInsertion [toSql comment, SqlNull, toSql pri]
+         itemId <- getLastId conn
+         print itemId
+         unless (null tags) $ do
+            tagIds <- findOrCreateTags conn tags
+            insertStatement <- prepare conn "INSERT INTO tag_map (item_id, tag_id) VALUES (?,?)"
+            mapM_ (execute insertStatement) [[toSql itemId, tag] | tag <- map toSql tagIds]
+         commit conn
+         disconnect conn
    where 
+      findOrCreateTags :: (IConnection c) => c -> [String] -> IO [Integer]
+      findOrCreateTags conn = mapM findOrCreateTag
+         where
+            findOrCreateTag :: String -> IO Integer
+            findOrCreateTag tag = do
+               res <- return . tryGetId =<< quickQuery' conn "select id from tags where tag_name = ?" [toSql tag]
+               case res of
+                  Just x -> return x
+                  Nothing -> do
+                     run conn "INSERT INTO tags (tag_name) VALUES (?)" [toSql tag]
+                     getLastId conn
+
+            tryGetId :: [[SqlValue]] -> Maybe Integer
+            tryGetId [[x]] = Just (fromSql x)
+            tryGetId _ = Nothing
+
+      getData :: IO (String, String, [String])
+      getData = do
+         putStrFlush "comment> "
+         description <- getLine
+         if (null description) 
+            then 
+               return ("", "", [])
+            else do
+               putStrFlush "priority> "
+               priority <- getLine
+               if (null priority) 
+                  then
+                     return ("", "", [])
+                  else do
+                     putStrFlush "tags> "
+                     tags <- getLine
+                     return (description, priority, words tags)
+
       putStrFlush :: String -> IO ()
       putStrFlush s = putStr s >> hFlush stdout 
 
@@ -158,6 +194,12 @@ executeAddCommand config showFlags = do
       addInsertion = "INSERT INTO items (description, created_at, parent_id, priority)" ++ 
                      "VALUES (?, datetime() ,?,?)"
 
+getLastId :: (IConnection c) => c -> IO Integer
+getLastId conn = return . extractId =<< quickQuery' conn "select last_insert_rowid()" []
+
+extractId :: [[SqlValue]] -> Integer
+extractId [[x]] = fromSql x
+extractId _ = error "Could not parse id result."
 
 executeEditCommand :: Config -> TodoCommand -> IO ()
 executeEditCommand _ _ = unimplemented

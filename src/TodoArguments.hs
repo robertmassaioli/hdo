@@ -24,6 +24,7 @@ data TodoCommand
                { fromFile :: Maybe FilePath 
                , priority :: Maybe Integer
                , databaseFile :: Maybe FilePath
+               , parent :: Maybe Integer
                }
             | Done 
                { databaseFile :: Maybe FilePath
@@ -121,6 +122,10 @@ addMode = Add
             , priority = Nothing &= name "priority" 
                                  &= help "What priority level is this todo item." 
                                  &= typ "[1-9]"
+            , parent = def &= explicit
+                           &= name "parent" &= name "g"
+                           &= help "Choose the parent for this item."
+                           &= typ "<parent_id>"
             , databaseFile = def
                &= explicit
                &= name "d" &= name "database"
