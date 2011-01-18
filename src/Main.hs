@@ -139,13 +139,17 @@ executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config showFlags = do
    putStrFlush "comment> "
    comment <- getLine
-   putStrFlush "priority> "
-   priority <- getLine
-   putStrFlush "tags> "
-   tags <- getLine
-   conn <- getDatabaseConnection
-   run conn addInsertion [toSql comment, SqlNull, toSql priority]
-   commit conn >> disconnect conn
+   if (null comment) 
+      then 
+         putStrLn "Need a comment to continue."
+      else do
+         putStrFlush "priority> "
+         priority <- getLine
+         putStrFlush "tags> "
+         tags <- getLine
+         conn <- getDatabaseConnection
+         run conn addInsertion [toSql comment, SqlNull, toSql priority]
+         commit conn >> disconnect conn
    where 
       putStrFlush :: String -> IO ()
       putStrFlush s = putStr s >> hFlush stdout 
