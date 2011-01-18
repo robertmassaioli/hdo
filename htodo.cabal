@@ -60,6 +60,9 @@ Executable htodo
       , HDBC == 2.2.6.1
       , HDBC-sqlite3 == 2.3.1.0
       , mtl == 1.1.0.2
+      -- remove once done
+      , filepath == 1.2.0.0
+      , pretty-show == 1.1.1
   
   -- Modules not exported by this package.
   -- Other-modules:       

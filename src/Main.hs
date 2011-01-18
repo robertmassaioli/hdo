@@ -1,12 +1,12 @@
 import Control.Monad (unless, liftM)
 import Control.Monad.Reader
 import Data.Maybe (catMaybes)
-import Data.List (intersperse)
 
 import Database.HDBC
 import Database.HDBC.Sqlite3
 import Data.Time (LocalTime)
-import Data.List(sortBy)
+import Data.List(sortBy, intersperse)
+import Data.Ord(comparing)
 
 import Filter
 import TodoArguments
@@ -19,6 +19,7 @@ import Text.Show.Pretty
 
 import System.Directory
 import System.FilePath
+import System.IO
 
 prettyShow :: (Show a) => a -> IO ()
 prettyShow = putStrLn . ppShow
@@ -33,7 +34,7 @@ data Config = Config
 defaultConfig :: IO Config
 defaultConfig = do 
    appDir <- getAppUserDataDirectory "htodo"
-   return $ Config
+   return Config
       { defaultDatabaseName = "htodo.db"
       , defaultAppDirectory = appDir
       , defaultSchemaDir = "./schema"
@@ -45,7 +46,7 @@ main = do
    prettyShow config
    command <- getCommandInput
    prettyShow command
-   executeCommand command
+   executeCommand config command
 
 setupAppDir :: ReaderT Config IO ()
 setupAppDir = do
@@ -55,7 +56,7 @@ setupAppDir = do
       unless appDirExists $ do
          createDirectory (defaultAppDirectory config)
          createDatabase 
-            ((defaultAppDirectory config) </> (defaultDatabaseName config)) 
+            (defaultAppDirectory config </> defaultDatabaseName config) 
             (defaultSchemaDir config </> create_file)
    where
       create_file :: FilePath
@@ -66,33 +67,31 @@ createDatabase databaseFile schemaFile = do
    conn <- connectSqlite3 databaseFile
    putStrLn databaseFile
    createCommands <- readFile schemaFile
-   prettyShow $ map init . lines $ createCommands
    withTransaction conn (createEverything createCommands)
    disconnect conn
    where
       createEverything :: (IConnection conn) => String -> conn -> IO ()
-      createEverything createCommands conn = mapM_ (quickQuery'' conn []) . map init . lines $ createCommands
-         where quickQuery'' conn qry reps = quickQuery' conn reps qry 
+      createEverything createCommands conn = mapM_ (quickQuery'' conn) . lines $ createCommands
+         where quickQuery'' conn qry = quickQuery' conn qry []
 
-executeCommand :: TodoCommand -> IO ()
-executeCommand x@(Show {}) = runReaderT executeShowCommand x
-executeCommand x@(Init {}) = executeInitCommand x
-executeCommand x@(Add {}) = executeAddCommand x
-executeCommand x@(Edit {}) = executeEditCommand x
-executeCommand x@(Done {}) = executeDoneCommand x
+executeCommand :: Config -> TodoCommand -> IO ()
+executeCommand c x@(Show {}) = executeShowCommand c x
+executeCommand c x@(Init {}) = executeInitCommand c x
+executeCommand c x@(Add {}) = executeAddCommand c x
+executeCommand c x@(Edit {}) = executeEditCommand c x
+executeCommand c x@(Done {}) = executeDoneCommand c x
 
-executeShowCommand :: ReaderT TodoCommand IO ()
-executeShowCommand = do
-   showFlags <- ask
+executeShowCommand :: Config -> TodoCommand -> IO ()
+executeShowCommand config showFlags = do
    case showUsingTags showFlags of
-      Nothing -> liftIO $ putStrLn "No Tags."
-      Just x -> liftIO $ print $ separateCommas x
-   liftIO $ unless (filter_str showFlags == "") $ print (getFilters $ filter_str showFlags)
-   conn <- liftIO $ connectSqlite3 ".htodo.db"
-   liftIO $ getTodoItems conn >>= displayItems
-   liftIO $ disconnect conn
+      Nothing -> putStrLn "No Tags."
+      Just x -> print $ separateCommas x
+   unless (filter_str == "") $ print (getFilters filter_str)
+   conn <- getDatabaseConnection
+   getTodoItems conn >>= displayItems
+   disconnect conn
    where
-      filter_str showFlags = concat . intersperse "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
+      filter_str = concat . intersperse "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
 
 displayItems :: [Item] -> IO ()
 displayItems = mapM_ (displayItemHelper 0)
@@ -107,7 +106,7 @@ displayItems = mapM_ (displayItemHelper 0)
 getTodoItems :: (IConnection c) => c -> IO [Item]
 getTodoItems conn = do
    topLevels <- quickQuery' conn "select i.* from items i where i.parent_id is ?" [SqlNull]
-   mapM createChild topLevels >>= return . sortItems
+   fmap sortItems $ mapM createChild topLevels
    where
       createChild :: [SqlValue] -> IO Item
       createChild [iid, ide, ica, _, ipr] = do
@@ -122,7 +121,7 @@ getTodoItems conn = do
                   }
 
       sortItems :: [Item] -> [Item]
-      sortItems = sortBy $ \x y -> compare (itemPriority x) (itemPriority y)
+      sortItems = sortBy $ \x y -> comparing itemPriority x y
 
 data Item = Item
    { itemId :: Integer
@@ -133,17 +132,34 @@ data Item = Item
    }
    deriving(Show, Eq)
 
-executeInitCommand :: TodoCommand -> IO ()
-executeInitCommand _ = unimplemented
+executeInitCommand :: Config -> TodoCommand -> IO ()
+executeInitCommand config showFlags = undefined
 
-executeAddCommand :: TodoCommand -> IO ()
-executeAddCommand _ = unimplemented
+executeAddCommand :: Config -> TodoCommand -> IO ()
+executeAddCommand config showFlags = do
+   putStrFlush "comment> "
+   comment <- getLine
+   putStrFlush "priority> "
+   priority <- getLine
+   putStrFlush "tags> "
+   tags <- getLine
+   conn <- getDatabaseConnection
+   run conn addInsertion [toSql comment, SqlNull, toSql priority]
+   commit conn >> disconnect conn
+   where 
+      putStrFlush :: String -> IO ()
+      putStrFlush s = putStr s >> hFlush stdout 
 
-executeEditCommand :: TodoCommand -> IO ()
-executeEditCommand _ = unimplemented
+      addInsertion :: String
+      addInsertion = "INSERT INTO items (description, created_at, parent_id, priority)" ++ 
+                     "VALUES (?, datetime() ,?,?)"
 
-executeDoneCommand :: TodoCommand -> IO ()
-executeDoneCommand _ = unimplemented
+
+executeEditCommand :: Config -> TodoCommand -> IO ()
+executeEditCommand _ _ = unimplemented
+
+executeDoneCommand :: Config -> TodoCommand -> IO ()
+executeDoneCommand _ _ = unimplemented
 
 unimplemented = putStrLn "Not Implemented Yet"
 
@@ -157,3 +173,6 @@ separateBy sep input = case parse parseCommas "(unknown)" input of
 
 separateCommas :: String -> Maybe [String]
 separateCommas = separateBy ','
+
+getDatabaseConnection :: IO Connection
+getDatabaseConnection = connectSqlite3 ".htodo.db"
