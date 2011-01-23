@@ -25,6 +25,8 @@ program itself. (Also just make sure that ~/.cabal/bin, or its windows equivalen
 For now all of the instructions that are avaliable can be gathered via the command line --help
 option. For the general overview of what this program does please just do the following:
 
-    $ htodo --help=one
+    $ htodo --help
 
-And it will print out all of your options.
+And it will print out all of your options. From there it should be pretty obvious what does what.
+For a better breakdown of how to use this program please check out the original intro blog post for
+it: Not Written Yet

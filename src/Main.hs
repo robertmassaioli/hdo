@@ -1,5 +1,7 @@
 import Control.Monad (unless, liftM)
 import Control.Monad.Reader
+
+import Control.Monad.Maybe
 import Data.Maybe (catMaybes)
 
 import Database.HDBC
@@ -7,9 +9,7 @@ import Database.HDBC.Sqlite3
 import Data.Time (LocalTime)
 import Data.List(sortBy, intersperse)
 import Data.Ord(comparing)
-
-import Filter
-import TodoArguments
+import Data.Maybe(fromMaybe)
 
 import Text.Parsec
 import Text.Parsec.String
@@ -17,28 +17,20 @@ import Text.Parsec.Token
 
 import Text.Show.Pretty
 
-import System.Directory
-import System.FilePath
-import System.IO
+import System.Directory(doesDirectoryExist, createDirectory)
+import System.FilePath( (</>) )
+import System.IO(hFlush, stdout)
+
+import System.Console.Haskeline
+
+import Filter
+import TodoArguments
+import Configuration
+
+-- Use Haskeline for tde!!!
 
 prettyShow :: (Show a) => a -> IO ()
 prettyShow = putStrLn . ppShow
-
-data Config = Config 
-   { defaultDatabaseName :: String
-   , defaultAppDirectory :: FilePath
-   , defaultSchemaDir :: FilePath
-   }
-   deriving(Show)
-
-defaultConfig :: IO Config
-defaultConfig = do 
-   appDir <- getAppUserDataDirectory "htodo"
-   return Config
-      { defaultDatabaseName = "htodo.db"
-      , defaultAppDirectory = appDir
-      , defaultSchemaDir = "./schema"
-      }
 
 main = do
    config <- defaultConfig
@@ -83,15 +75,27 @@ executeCommand c x@(Done {}) = executeDoneCommand c x
 
 executeShowCommand :: Config -> TodoCommand -> IO ()
 executeShowCommand config showFlags = do
-   case showUsingTags showFlags of
-      Nothing -> putStrLn "No Tags."
-      Just x -> print $ separateCommas x
-   unless (filter_str == "") $ print (getFilters filter_str)
    conn <- getDatabaseConnection
-   getTodoItems conn >>= (\s -> print s >> displayItems s)
+   unless (filter_str == "") $ print (getFilters filter_str)
+   case showUsingTags showFlags of
+      Nothing -> do 
+         getTodoItems conn (generateQuery []) >>= displayItems
+      Just x -> case separateCommas x of
+                  Nothing -> putStrLn "Invalid text was placed in the tags."
+                  Just x -> getTodoItems conn (generateQuery x) >>= displayItems
    disconnect conn
    where
       filter_str = concat . intersperse "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
+
+      generateQuery :: [String] -> String
+      generateQuery [] = "select i.* from items i where 1 = 1"
+      generateQuery xs = queryLeft ++ " AND (" 
+                         ++ (concat . intersperse " OR " . map (\s -> "t.tag_name = \"" ++ s ++ "\"") $ xs)
+                         ++ ")"
+
+      queryLeft = "SELECT i.* from items i, tags t, tag_map tm where "
+                   ++ "i.id = tm.item_id AND "
+                   ++ "tm.tag_id = t.id"
 
 displayItems :: [Item] -> IO ()
 displayItems = mapM_ (displayItemHelper 0)
@@ -103,16 +107,18 @@ displayItems = mapM_ (displayItemHelper 0)
          putStrLn $ itemDescription item
          mapM_ (displayItemHelper (level + 1)) (itemChildren item)
    
-getTodoItems :: (IConnection c) => c -> IO [Item]
-getTodoItems conn = do
-   topLevels <- quickQuery' conn "select i.* from items i where i.parent_id is ?" [SqlNull]
+getTodoItems :: (IConnection c) => c -> String -> IO [Item]
+getTodoItems conn baseQuery = do
+   topLevels <- quickQuery' conn topLevelQuery [SqlNull]
    fmap sortItems $ mapM createChild topLevels
    where
+      topLevelQuery = baseQuery ++ " AND i.parent_id is ?"
+      childQuery = baseQuery ++ " AND i.parent_id = ?"
+
       createChild :: [SqlValue] -> IO Item
       createChild [iid, ide, ica, _, ipr] = do
          let this_id = fromSql iid :: Integer
-         children <- mapM createChild =<< quickQuery' conn "select i.* from items i where i.parent_id = ?" [toSql this_id]
-         putStrLn $ show (toSql this_id)
+         children <- mapM createChild =<< quickQuery' conn childQuery [toSql this_id]
          return Item
                   { itemId = fromSql iid
                   , itemDescription = fromSql ide
@@ -138,11 +144,10 @@ executeInitCommand config showFlags = undefined
 
 executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config addFlags = do
-   (comment, pri, tags) <- getData
-   if (null comment) || (null pri)
-      then
-         putStrLn "Need a comment and priority to add a new item."
-      else do
+   d <- getData
+   case d of
+      Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
+      Just (comment, pri, tags) -> do
          conn <- getDatabaseConnection
          run conn addInsertion [toSql comment, toSql (parent addFlags), toSql pri]
          itemId <- getLastId conn
@@ -170,23 +175,17 @@ executeAddCommand config addFlags = do
             tryGetId [[x]] = Just (fromSql x)
             tryGetId _ = Nothing
 
-      getData :: IO (String, String, [String])
-      getData = do
-         putStrFlush "comment> "
-         description <- getLine
-         if (null description) 
-            then 
-               return ("", "", [])
-            else do
-               putStrFlush "priority> "
-               priority <- getLine
-               if (null priority) 
-                  then
-                     return ("", "", [])
-                  else do
-                     putStrFlush "tags> "
-                     tags <- getLine
-                     return (description, priority, words tags)
+      getData :: IO (Maybe (String, String, [String]))
+      getData = runInputT defaultSettings (runMaybeT getDataHelper)
+         where
+            getDataHelper :: MaybeT (InputT IO) (String, String, [String])
+            getDataHelper = do
+               Just description <- lift $ getInputLine "comment> "
+               guard (not $ null description)
+               Just pri <- lift $ getInputLine "priority> "
+               guard (not $ null pri)
+               Just tags <- lift $ getInputLine "tags> "
+               return (description, pri, words tags)
 
       putStrFlush :: String -> IO ()
       putStrFlush s = putStr s >> hFlush stdout 
@@ -203,7 +202,9 @@ extractId [[x]] = fromSql x
 extractId _ = error "Could not parse id result."
 
 executeEditCommand :: Config -> TodoCommand -> IO ()
-executeEditCommand _ _ = unimplemented
+executeEditCommand config editCommand = do
+   
+   
 
 executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand _ _ = unimplemented
