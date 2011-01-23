@@ -142,7 +142,7 @@ data Item = Item
    deriving(Show, Eq)
 
 executeInitCommand :: Config -> TodoCommand -> IO ()
-executeInitCommand config showFlags = undefined
+executeInitCommand config showFlags = unimplemented
 
 executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config addFlags = do
@@ -221,9 +221,13 @@ executeEditCommand config editCommand = do
                   case newData of
                      Nothing -> putStrLn "Invalid input or early termination."
                      Just (desc, pri, tags) -> do 
+                        -- TODO create an edit event here to log the change
                         run conn updateItem [toSql desc, toSql pri, toSql id]
                         findOrCreateTags conn (tags \\ oldTags) >>= mapM_ (createTagMapping conn id)
                         getTagMapIds conn id (oldTags \\ tags) >>= mapM_ (deleteTagMapping conn id)
+                        -- please note that we intentionally do not delete tags here; just the
+                        -- mappings, we leave them around for later use. The 'htodo clean' or maybe
+                        -- 'htodo gc' command will do that cleanup I think.
             where
                updateItem = "UPDATE items SET description = ?, priority = ? where id = ?"
 
