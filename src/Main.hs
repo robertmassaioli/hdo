@@ -7,9 +7,11 @@ import Data.Maybe (catMaybes)
 import Database.HDBC
 import Database.HDBC.Sqlite3
 import Data.Time (LocalTime)
-import Data.List(sortBy, intersperse)
+import Data.List(sortBy, intersperse, (\\), nub, intercalate)
 import Data.Ord(comparing)
 import Data.Maybe(fromMaybe)
+
+import Data.Char (isDigit)
 
 import Text.Parsec
 import Text.Parsec.String
@@ -159,21 +161,6 @@ executeAddCommand config addFlags = do
          disconnect conn
          putStrLn $ "Added item " ++ show itemId ++ " successfully."
    where 
-      findOrCreateTags :: (IConnection c) => c -> [String] -> IO [Integer]
-      findOrCreateTags conn = mapM findOrCreateTag
-         where
-            findOrCreateTag :: String -> IO Integer
-            findOrCreateTag tag = do
-               res <- return . tryGetId =<< quickQuery' conn "select id from tags where tag_name = ?" [toSql tag]
-               case res of
-                  Just x -> return x
-                  Nothing -> do
-                     run conn "INSERT INTO tags (tag_name) VALUES (?)" [toSql tag]
-                     getLastId conn
-
-            tryGetId :: [[SqlValue]] -> Maybe Integer
-            tryGetId [[x]] = Just (fromSql x)
-            tryGetId _ = Nothing
 
       getData :: IO (Maybe (String, String, [String]))
       getData = runInputT defaultSettings (runMaybeT getDataHelper)
@@ -194,6 +181,22 @@ executeAddCommand config addFlags = do
       addInsertion = "INSERT INTO items (description, created_at, parent_id, priority)" ++ 
                      "VALUES (?, datetime() ,?,?)"
 
+findOrCreateTags :: (IConnection c) => c -> [String] -> IO [Integer]
+findOrCreateTags conn = mapM findOrCreateTag
+   where
+      findOrCreateTag :: String -> IO Integer
+      findOrCreateTag tag = do
+         res <- return . tryGetId =<< quickQuery' conn "select id from tags where tag_name = ?" [toSql tag]
+         case res of
+            Just x -> return x
+            Nothing -> do
+               run conn "INSERT INTO tags (tag_name) VALUES (?)" [toSql tag]
+               getLastId conn
+
+      tryGetId :: [[SqlValue]] -> Maybe Integer
+      tryGetId [[x]] = Just (fromSql x)
+      tryGetId _ = Nothing
+
 getLastId :: (IConnection c) => c -> IO Integer
 getLastId conn = return . extractId =<< quickQuery' conn "select last_insert_rowid()" []
 
@@ -203,8 +206,63 @@ extractId _ = error "Could not parse id result."
 
 executeEditCommand :: Config -> TodoCommand -> IO ()
 executeEditCommand config editCommand = do
-   
-   
+   conn <- getDatabaseConnection
+   mapM_ (editSingleId conn) $ editIds editCommand
+   commit conn
+   disconnect conn
+      where
+         editSingleId :: (IConnection c) => c -> Integer -> IO ()
+         editSingleId conn id = do
+            d <- runMaybeT $ getEditData conn id
+            case d of
+               Nothing -> putStrLn $ "Could not find data for id: " ++ show id
+               Just oldData@(_,_,oldTags) -> do 
+                  newData <- runInputT defaultSettings (runMaybeT (askEditQuestions oldData))
+                  case newData of
+                     Nothing -> putStrLn "Invalid input or early termination."
+                     Just (desc, pri, tags) -> do 
+                        run conn updateItem [toSql desc, toSql pri, toSql id]
+                        findOrCreateTags conn (tags \\ oldTags) >>= mapM_ (createTagMapping conn id)
+                        getTagMapIds conn id (oldTags \\ tags) >>= mapM_ (deleteTagMapping conn id)
+            where
+               updateItem = "UPDATE items SET description = ?, priority = ? where id = ?"
+
+               getTagMapIds :: (IConnection c) => c -> Integer -> [String] -> IO [Integer]
+               getTagMapIds _ _ [] = return []
+               getTagMapIds conn itemId tags = do
+                  quickQuery' conn theQuery [toSql itemId] >>= return . map fromSql . concat
+                  where
+                     theQuery = "SELECT tm.tag_id from tag_map tm, tags t where t.id = tm.tag_id and (" ++ tagOrList ++ ") and tm.item_id = ?"
+                     tagOrList = intercalate "," $ map (\s -> "t.tag_name = \"" ++ s ++ "\"") tags
+
+               deleteTagMapping :: (IConnection c) => c -> Integer -> Integer -> IO ()
+               deleteTagMapping conn itemId tagId = run conn deleteCommand [toSql itemId, toSql tagId] >> return ()
+                  where deleteCommand = "DELETE FROM tag_map WHERE item_id = ? AND tag_id = ?"
+
+               createTagMapping :: (IConnection c) => c -> Integer -> Integer -> IO ()
+               createTagMapping conn itemId tagId = run conn "INSERT INTO tag_map (item_id, tag_id) VALUES (?,?)" [toSql itemId, toSql tagId] >> return ()
+
+               getDescAndPri :: [[SqlValue]] -> Maybe (String, Integer)
+               getDescAndPri vals = case vals of
+                  [[a,b]]  -> Just (fromSql a, fromSql b)
+                  _        -> Nothing
+
+               getEditData :: (IConnection c) => c -> Integer -> MaybeT IO (String, Integer, [String])
+               getEditData conn id = do
+                  [[sqlDescription, sqlPriority]] <- lift $ quickQuery' conn "select description, priority from items where id = ?" [toSql id]
+                  sqlTags <- lift $ quickQuery' conn "select t.tag_name from tags t, tag_map tm, items i where i.id = tm.item_id and tm.tag_id = t.id and i.id = ?" [toSql id]
+                  return (fromSql sqlDescription, fromSql sqlPriority, map fromSql (concat sqlTags))
+
+               askEditQuestions :: (String, Integer, [String]) -> MaybeT (InputT IO) (String, Integer, [String])
+               askEditQuestions (desc, pri, tags) = do
+                  Just newDesc <- lift $ getInputLineDefault desc "comment> "
+                  guard (not $ null newDesc)
+                  Just newPri <- lift $ getInputLineDefault (show pri) "priority> "
+                  guard (not $ null newPri)
+                  guard (and $ map isDigit newPri) -- the priority must be a digit
+                  Just newTags <- lift $ getInputLineDefault (unwords tags) "tags> "
+                  return (newDesc, read newPri, nub . words $ newTags)
+                  
 
 executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand _ _ = unimplemented
