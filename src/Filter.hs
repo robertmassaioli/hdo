@@ -5,7 +5,9 @@ module Filter (
    getFilters
    ) where
 
-import Text.ParserCombinators.Parsec
+import Text.Parsec
+import Text.Parsec.String
+import Range
 
 data FilterType 
    = FilterTypeAdd 
@@ -37,53 +39,51 @@ data Filter
       }
    deriving(Eq, Show)
 
-data Range a
-   = SingletonRange a
-   | SpanRange a a
-   deriving(Eq, Show)
-
 getFilters :: String -> Either ParseError [Filter]
 getFilters = parse parseFilters "(filter)"
 
-parseFilters :: CharParser st [Filter]
+parseFilters :: Parser [Filter]
 parseFilters = sepBy1 parseFilter (char ',')
 
-parseFilter :: CharParser st Filter
+parseFilter :: Parser Filter
 parseFilter 
    = try (templateFilter "all" FilterAll)
    <|> try (templateFilter "children" FilterChildren)
    <|> try (templateFilter "done" FilterDone)
    <|> try indexRanges
    where
-      templateFilter :: String -> (FilterType -> Filter) -> CharParser st Filter
+      templateFilter :: String -> (FilterType -> Filter) -> Parser Filter
       templateFilter name constructor = do
          ft <- parseFilterType
          string name
          return $ constructor ft
 
-      indexRanges :: CharParser st Filter
+      indexRanges :: Parser Filter
       indexRanges = do
          ft <- parseFilterType
-         ranges <- sepBy1 indexRange (char '.')
+         ranges <- parseRanges '.'
          return FilterIndex { filterType = ft, filterRange = ranges }
-         where
-            indexRange :: CharParser st (Range Integer)
-            indexRange = do
-               first <- many1 digit
-               decide first
 
-            decide :: String -> CharParser st (Range Integer)
-            decide first = 
-               (do
-                  char '-'
-                  second <- many1 digit 
-                  return (SpanRange (read first) (read second))
-               )
-               <|> return (SingletonRange (read first))
-
-      parseFilterType :: CharParser st FilterType
+      parseFilterType :: Parser FilterType
       parseFilterType 
          = (char '+' >> return FilterTypeAdd)
          <|> (char '-' >> return FilterTypeRemove)
          <|> (char '=' >> return FilterTypeEquals)
          <|> return FilterTypeDefault
+
+parseRanges :: Char -> Parser [Range Integer]
+parseRanges c = sepBy1 parseRange (char c)
+   where 
+      parseRange :: Parser (Range Integer)
+      parseRange = do
+         first <- many1 digit
+         decide first
+
+      decide :: String -> Parser (Range Integer)
+      decide first = 
+         (do
+            char '-'
+            second <- many1 digit 
+            return (SpanRange (read first) (read second))
+         )
+         <|> return (SingletonRange (read first))

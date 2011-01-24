@@ -28,6 +28,7 @@ import System.Console.Haskeline
 import Filter
 import TodoArguments
 import Configuration
+import Range
 
 -- Use Haskeline for tde!!!
 
@@ -294,3 +295,27 @@ separateCommas = separateBy ','
 
 getDatabaseConnection :: IO Connection
 getDatabaseConnection = connectSqlite3 ".htodo.db"
+
+{-
+parseRanges :: String -> Maybe [Range]
+parseRanges input =
+   case parse parseRangeHelper "(ranges)" input of
+      Left _ -> Nothing
+      Right x -> Just x
+   where
+      parseRangeHelper :: Parser [Range]
+      parseRangeHelper = sepBy (many parseRange) (char ',')
+
+      parseRange :: Parser Range
+      parseRange = try (parseRangeSpan) <|> parseRangeSingleton <?> "Could not parse valid range."
+
+      parseRangeSpan :: Parser Range
+      parseRangeSpan = do
+         first <- many digit
+         char '-'
+         second <- many digit
+         return $ RangeSpan first second
+
+      parseRangeSingleton :: Parser Range
+      parseRangeSingleton = many digit
+-}
