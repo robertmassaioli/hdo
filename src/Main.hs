@@ -7,7 +7,7 @@ import Data.Maybe (catMaybes)
 import Database.HDBC
 import Database.HDBC.Sqlite3
 import Data.Time (LocalTime)
-import Data.List(sortBy, intersperse, (\\), nub, intercalate)
+import Data.List(sortBy, (\\), nub, intercalate)
 import Data.Ord(comparing)
 import Data.Maybe(fromMaybe)
 
@@ -41,6 +41,9 @@ main = do
    command <- getCommandInput
    prettyShow command
    executeCommand config command
+
+data EventTypes = EventAdd | EventEdit | EventDone | EventRemove
+                deriving(Enum, Eq, Show)
 
 setupAppDir :: ReaderT Config IO ()
 setupAppDir = do
@@ -87,12 +90,12 @@ executeShowCommand config showFlags = do
                   Just x -> getTodoItems conn (generateQuery x) >>= displayItems
    disconnect conn
    where
-      filter_str = concat . intersperse "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
+      filter_str = intercalate "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
 
       generateQuery :: [String] -> String
       generateQuery [] = "select i.* from items i where 1 = 1"
       generateQuery xs = queryLeft ++ " AND (" 
-                         ++ (concat . intersperse " OR " . map (\s -> "t.tag_name = \"" ++ s ++ "\"") $ xs)
+                         ++ (intercalate " OR " . map (\s -> "t.tag_name = \"" ++ s ++ "\"") $ xs)
                          ++ ")"
 
       queryLeft = "SELECT i.* from items i, tags t, tag_map tm where "
@@ -153,9 +156,10 @@ executeAddCommand config addFlags = do
          conn <- getDatabaseConnection
          run conn addInsertion [toSql comment, toSql (parent addFlags), toSql pri]
          itemId <- getLastId conn
+         run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
          unless (null tags) $ do
-            tagIds <- findOrCreateTags conn tags
-            insertStatement <- prepare conn "INSERT INTO tag_map (item_id, tag_id) VALUES (?,?)"
+            tagIds <- findOrCreateTags conn itemId tags
+            insertStatement <- prepare conn "INSERT INTO tag_map (item_id, tag_id, created_at) VALUES (?,?, datetime())"
             mapM_ (execute insertStatement) [[toSql itemId, tag] | tag <- map toSql tagIds]
          commit conn
          disconnect conn
@@ -181,8 +185,8 @@ executeAddCommand config addFlags = do
       addInsertion = "INSERT INTO items (description, created_at, parent_id, priority)" ++ 
                      "VALUES (?, datetime() ,?,?)"
 
-findOrCreateTags :: (IConnection c) => c -> [String] -> IO [Integer]
-findOrCreateTags conn = mapM findOrCreateTag
+findOrCreateTags :: (IConnection c) => c -> Integer -> [String] -> IO [Integer]
+findOrCreateTags conn itemId = mapM findOrCreateTag
    where
       findOrCreateTag :: String -> IO Integer
       findOrCreateTag tag = do
@@ -190,7 +194,7 @@ findOrCreateTags conn = mapM findOrCreateTag
          case res of
             Just x -> return x
             Nothing -> do
-               run conn "INSERT INTO tags (tag_name) VALUES (?)" [toSql tag]
+               run conn "INSERT INTO tags (tag_name, created_at) VALUES (?, datetime())" [toSql tag]
                getLastId conn
 
       tryGetId :: [[SqlValue]] -> Maybe Integer
@@ -223,8 +227,10 @@ executeEditCommand config editCommand = do
                      Just (desc, pri, tags) -> do 
                         -- TODO create an edit event here to log the change
                         run conn updateItem [toSql desc, toSql pri, toSql id]
-                        findOrCreateTags conn (tags \\ oldTags) >>= mapM_ (createTagMapping conn id)
-                        getTagMapIds conn id (oldTags \\ tags) >>= mapM_ (deleteTagMapping conn id)
+                        cs <- prepare conn createStatement
+                        ds <- prepare conn deleteStatement
+                        findOrCreateTags conn id (tags \\ oldTags) >>= mapM_ (createTagMapping cs id)
+                        getTagMapIds conn id (oldTags \\ tags) >>= mapM_ (deleteTagMapping ds id)
                         -- please note that we intentionally do not delete tags here; just the
                         -- mappings, we leave them around for later use. The 'htodo clean' or maybe
                         -- 'htodo gc' command will do that cleanup I think.
@@ -237,14 +243,16 @@ executeEditCommand config editCommand = do
                   quickQuery' conn theQuery [toSql itemId] >>= return . map fromSql . concat
                   where
                      theQuery = "SELECT tm.tag_id from tag_map tm, tags t where t.id = tm.tag_id and (" ++ tagOrList ++ ") and tm.item_id = ?"
-                     tagOrList = intercalate "," $ map (\s -> "t.tag_name = \"" ++ s ++ "\"") tags
+                     tagOrList = intercalate " OR " $ map (\s -> "t.tag_name = \"" ++ s ++ "\"") tags
 
-               deleteTagMapping :: (IConnection c) => c -> Integer -> Integer -> IO ()
-               deleteTagMapping conn itemId tagId = run conn deleteCommand [toSql itemId, toSql tagId] >> return ()
-                  where deleteCommand = "DELETE FROM tag_map WHERE item_id = ? AND tag_id = ?"
+               deleteTagMapping :: Statement -> Integer -> Integer -> IO ()
+               deleteTagMapping statement itemId tagId = execute statement [toSql itemId, toSql tagId] >> return ()
 
-               createTagMapping :: (IConnection c) => c -> Integer -> Integer -> IO ()
-               createTagMapping conn itemId tagId = run conn "INSERT INTO tag_map (item_id, tag_id) VALUES (?,?)" [toSql itemId, toSql tagId] >> return ()
+               createTagMapping :: Statement -> Integer -> Integer -> IO ()
+               createTagMapping statement itemId tagId = execute statement [toSql itemId, toSql tagId] >> return ()
+
+               createStatement = "INSERT INTO tag_map (item_id, tag_id, created_at) VALUES (?,?, datetime())"
+               deleteStatement = "DELETE FROM tag_map WHERE item_id = ? AND tag_id = ?"
 
                getDescAndPri :: [[SqlValue]] -> Maybe (String, Integer)
                getDescAndPri vals = case vals of

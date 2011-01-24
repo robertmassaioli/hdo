@@ -1,7 +1,6 @@
-PRAGMA foreign_keys = ON;
 -- deletes all of the databases in the program
 drop table updates;
 drop table items;
-drop table events;
+drop table item_events;
 drop table tags;
 drop table tag_map;
