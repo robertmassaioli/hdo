@@ -26,6 +26,7 @@ create table item_events (
    id integer primary key autoincrement not null,
    item_id integer not null, 
    item_event_type integer not null,
+   event_description text,
    occurred_at datetime not null,
    FOREIGN KEY(item_id) references items(id) on delete cascade
    );

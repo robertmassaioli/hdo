@@ -284,7 +284,7 @@ executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand config doneCommand = do
    -- Todo replace this with withConnection
    conn <- getDatabaseConnection
-   getExistingElements conn mergedDoneRanges >>= printDone >>= mapM_ (markElementAsDone conn)
+   getExistingElements conn mergedDoneRanges >>= mapM_ (markElementAsDone conn)
    commit conn
    disconnect conn
    where
@@ -316,7 +316,16 @@ executeDoneCommand config doneCommand = do
                   alreadyDone s = "SELECT i.id from items i, item_events ie WHERE i.id = ie.item_id AND ie.item_event_type = ? AND (" ++ rangeToSqlOr s ++ ")"
 
       markElementAsDone :: (IConnection c) => c -> Integer -> IO ()
-      markElementAsDone conn itemId = run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventDone] >> return ()
+      markElementAsDone conn itemId = do 
+         [[sqlDes]] <- quickQuery' conn "SELECT description FROM items WHERE id = ?" [toSql itemId]
+         runInputT defaultSettings $ markDoneHelper (fromSql sqlDes)
+         where
+            markDoneHelper :: String -> InputT IO ()
+            markDoneHelper description = do
+               lift . putStrLn $ show itemId ++ ": " ++ description
+               comment <- getInputLine "comment> "
+               lift $ run conn "INSERT INTO item_events (item_id, item_event_type, event_description, occurred_at) VALUES (?, ?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventDone, toSql comment]
+               return ()
          
       rangeToSqlOr :: [Range Integer] -> String
       rangeToSqlOr = intercalate " OR " . toSqlHelper

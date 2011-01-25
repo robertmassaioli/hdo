@@ -1,0 +1,3 @@
+.read schema/destroy_database.sqlite3
+.read schema/create_database.sqlite3
+.read schema/initial_data.sqlite3
