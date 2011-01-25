@@ -3,12 +3,14 @@ module Range (
       rangesOverlap,
       mergeRange,
       mergeRanges,
+      fromRanges,
+      fromMergedRanges
    ) where
 
 import Data.Ord (comparing)
 import Data.List (sortBy)
 
-data Range a
+data (Ord a) => Range a
    = SingletonRange a
    | SpanRange a a
    deriving(Eq, Show)
@@ -41,6 +43,14 @@ mergeRanges ranges = mergeRangesHelper $ sortBy (comparing getLowest) ranges
                                      Right a -> mergeRangesHelper (a:xs)
       mergeRangesHelper xs = xs
 
-      getLowest :: Range a -> a
+      getLowest :: (Ord a) => Range a -> a
       getLowest (SingletonRange x) = x
       getLowest (SpanRange x _) = x
+
+fromRanges :: (Ord a, Enum a) => [Range a] -> [a]
+fromRanges [] = []
+fromRanges ((SingletonRange x):xs) = x : fromRanges xs
+fromRanges ((SpanRange a b):xs) = [a..b] ++ fromRanges xs
+
+fromMergedRanges :: (Ord a, Enum a) => [Range a] -> [a]
+fromMergedRanges = fromRanges . mergeRanges

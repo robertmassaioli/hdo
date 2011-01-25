@@ -71,15 +71,15 @@ parseFilter
          <|> (char '=' >> return FilterTypeEquals)
          <|> return FilterTypeDefault
 
-parseRanges :: Char -> Parser [Range Integer]
+parseRanges :: (Ord a, Read a) => Char -> Parser [Range a]
 parseRanges c = sepBy1 parseRange (char c)
    where 
-      parseRange :: Parser (Range Integer)
+      parseRange :: (Ord a, Read a) => Parser (Range a)
       parseRange = do
          first <- many1 digit
          decide first
 
-      decide :: String -> Parser (Range Integer)
+      decide :: (Ord a, Read a) => String -> Parser (Range a)
       decide first = 
          (do
             char '-'
