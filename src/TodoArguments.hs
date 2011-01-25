@@ -28,9 +28,10 @@ data TodoCommand
                }
             | Done 
                { databaseFile :: Maybe FilePath
+               , doneRanges :: String
                }
             | Edit 
-               { editIds :: [Integer] 
+               { editRanges :: String 
                , databaseFile :: Maybe FilePath
                }
             deriving(Eq, Show, Data, Typeable)
@@ -145,7 +146,8 @@ addMode = Add
 
 doneMode :: TodoCommand
 doneMode = Done 
-            { databaseFile = def
+            { doneRanges = def &= args
+            , databaseFile = def
                &= explicit
                &= name "d" &= name "database"
                &= typ "./path/to/database.db"
@@ -160,7 +162,7 @@ doneMode = Done
 
 editMode :: TodoCommand 
 editMode = Edit 
-            { editIds = [] &= args
+            { editRanges = [] &= args
             , databaseFile = def 
                &= explicit
                &= name "d" &= name "database"

@@ -2,14 +2,13 @@ import Control.Monad (unless, liftM)
 import Control.Monad.Reader
 
 import Control.Monad.Maybe
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 
 import Database.HDBC
 import Database.HDBC.Sqlite3
 import Data.Time (LocalTime)
-import Data.List(sortBy, (\\), nub, intercalate)
+import Data.List(sortBy, (\\), nub, intercalate, intersperse)
 import Data.Ord(comparing)
-import Data.Maybe(fromMaybe)
 
 import Data.Char (isDigit)
 
@@ -84,8 +83,7 @@ executeShowCommand config showFlags = do
    conn <- getDatabaseConnection
    unless (filter_str == "") $ print (getFilters filter_str)
    case showUsingTags showFlags of
-      Nothing -> do 
-         getTodoItems conn (generateQuery []) >>= displayItems
+      Nothing -> getTodoItems conn (generateQuery []) >>= displayItems
       Just x -> case separateCommas x of
                   Nothing -> putStrLn "Invalid text was placed in the tags."
                   Just x -> getTodoItems conn (generateQuery x) >>= displayItems
@@ -212,12 +210,18 @@ extractId _ = error "Could not parse id result."
 executeEditCommand :: Config -> TodoCommand -> IO ()
 executeEditCommand config editCommand = do
    conn <- getDatabaseConnection
-   mapM_ (editSingleId conn) $ editIds editCommand
+   sequence_ . intersperse (putStrLn "") . map (editSingleId conn) . getEditRanges . editRanges $ editCommand
    commit conn
    disconnect conn
       where
+         getEditRanges :: String -> [Integer]
+         getEditRanges input = case parse (parseRanges ',') "(edit_ranges)" input of
+                                 Left _ -> []
+                                 Right x -> fromMergedRanges x
+
          editSingleId :: (IConnection c) => c -> Integer -> IO ()
          editSingleId conn id = do
+            putStrLn $ "Now editing item: " ++ show id
             d <- runMaybeT $ getEditData conn id
             case d of
                Nothing -> putStrLn $ "Could not find data for id: " ++ show id
@@ -240,8 +244,7 @@ executeEditCommand config editCommand = do
 
                getTagMapIds :: (IConnection c) => c -> Integer -> [String] -> IO [Integer]
                getTagMapIds _ _ [] = return []
-               getTagMapIds conn itemId tags = do
-                  quickQuery' conn theQuery [toSql itemId] >>= return . map fromSql . concat
+               getTagMapIds conn itemId tags = fmap (map fromSql . concat) $ quickQuery' conn theQuery [toSql itemId]
                   where
                      theQuery = "SELECT tm.tag_id from tag_map tm, tags t where t.id = tm.tag_id and (" ++ tagOrList ++ ") and tm.item_id = ?"
                      tagOrList = intercalate " OR " $ map (\s -> "t.tag_name = \"" ++ s ++ "\"") tags
@@ -272,13 +275,58 @@ executeEditCommand config editCommand = do
                   guard (not $ null newDesc)
                   Just newPri <- lift $ getInputLineDefault (show pri) "priority> "
                   guard (not $ null newPri)
-                  guard (and $ map isDigit newPri) -- the priority must be a digit
+                  guard (all isDigit newPri) -- the priority must be a digit
                   Just newTags <- lift $ getInputLineDefault (unwords tags) "tags> "
                   return (newDesc, read newPri, nub . words $ newTags)
                   
 
 executeDoneCommand :: Config -> TodoCommand -> IO ()
-executeDoneCommand _ _ = unimplemented
+executeDoneCommand config doneCommand = do
+   -- Todo replace this with withConnection
+   conn <- getDatabaseConnection
+   getExistingElements conn mergedDoneRanges >>= printDone >>= mapM_ (markElementAsDone conn)
+   commit conn
+   disconnect conn
+   where
+      printDone :: [Integer] -> IO [Integer]
+      printDone xs = do 
+         putStrLn $ "Marking these id's as done: " ++ show xs
+         return xs
+
+      mergedDoneRanges = getDoneRanges . doneRanges $ doneCommand
+
+      getDoneRanges :: String -> [Range Integer]
+      getDoneRanges input = case parse (parseRanges ',') "(done_ranges)" input of
+                              Left _ -> []
+                              Right x -> mergeRanges x
+
+      getExistingElements :: (IConnection c) => c -> [Range Integer] -> IO [Integer]
+      getExistingElements conn mdr = 
+         case mdr of
+            [] -> return []
+            mdrxs -> do 
+                  existing <- fmap getListOfId $ quickQuery conn (existingItems mdrxs) []
+                  done <- fmap getListOfId $ quickQuery conn (alreadyDone mdrxs) [toSql $ fromEnum EventDone]
+                  return (existing \\ done)
+               where 
+                  getListOfId :: [[SqlValue]] -> [Integer]
+                  getListOfId = map fromSql . map head
+
+                  existingItems s = "SELECT i.id from items i WHERE " ++ rangeToSqlOr s
+                  alreadyDone s = "SELECT i.id from items i, item_events ie WHERE i.id = ie.item_id AND ie.item_event_type = ? AND (" ++ rangeToSqlOr s ++ ")"
+
+      markElementAsDone :: (IConnection c) => c -> Integer -> IO ()
+      markElementAsDone conn itemId = run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventDone] >> return ()
+         
+      rangeToSqlOr :: [Range Integer] -> String
+      rangeToSqlOr = intercalate " OR " . toSqlHelper
+         where
+            toSqlHelper :: [Range Integer] -> [String]
+            toSqlHelper [] = []
+            toSqlHelper (SpanRange x y:xs) = ("(" ++ show x ++ " <= i.id AND i.id <= " ++ show y ++ ")") : toSqlHelper xs
+            toSqlHelper (SingletonRange x:xs) = (show x ++ " = i.id") : toSqlHelper xs
+
+
 
 unimplemented = putStrLn "Not Implemented Yet"
 

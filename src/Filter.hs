@@ -1,8 +1,9 @@
-module Filter (
-   FilterType(..),
-   Filter(..),
-   Range(..),
-   getFilters
+module Filter 
+   ( FilterType(..)
+   , Filter(..)
+   , Range(..)
+   , getFilters
+   , parseRanges
    ) where
 
 import Text.Parsec

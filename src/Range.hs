@@ -25,9 +25,9 @@ isBetween :: (Ord a) => a -> (a, a) -> Bool
 isBetween a (x, y) = x <= a && a <= y
 
 mergeRange :: (Ord a) => Range a -> Range a -> Either (Range a, Range a) (Range a)
-mergeRange r1 r2 = case rangesOverlap r1 r2 of
-                     False -> Left (r1, r2)
-                     True -> Right $ assumeMerge r1 r2
+mergeRange r1 r2 = if rangesOverlap r1 r2
+                     then Right $ assumeMerge r1 r2
+                     else Left (r1, r2)
    where
       assumeMerge :: (Ord a) => Range a -> Range a -> Range a
       assumeMerge (SingletonRange _) x = x
@@ -49,8 +49,8 @@ mergeRanges ranges = mergeRangesHelper $ sortBy (comparing getLowest) ranges
 
 fromRanges :: (Ord a, Enum a) => [Range a] -> [a]
 fromRanges [] = []
-fromRanges ((SingletonRange x):xs) = x : fromRanges xs
-fromRanges ((SpanRange a b):xs) = [a..b] ++ fromRanges xs
+fromRanges (SingletonRange x:xs) = x : fromRanges xs
+fromRanges (SpanRange a b:xs) = [a..b] ++ fromRanges xs
 
 fromMergedRanges :: (Ord a, Enum a) => [Range a] -> [a]
 fromMergedRanges = fromRanges . mergeRanges
