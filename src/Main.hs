@@ -45,6 +45,9 @@ main = do
 data EventTypes = EventAdd | EventEdit | EventDone | EventRemove
                 deriving(Enum, Eq, Show)
 
+data ItemState = StateNotDone | StateDone
+               deriving(Enum, Eq, Show)
+
 setupAppDir :: ReaderT Config IO ()
 setupAppDir = do
    config <- ask
@@ -92,14 +95,12 @@ executeShowCommand config showFlags = do
       filter_str = intercalate "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
 
       generateQuery :: [String] -> String
-      generateQuery [] = "select i.* from items i where 1 = 1"
+      generateQuery [] = "SELECT i.* FROM items i where i.current_state < ? "
       generateQuery xs = queryLeft ++ " AND (" 
                          ++ (intercalate " OR " . map (\s -> "t.tag_name = \"" ++ s ++ "\"") $ xs)
                          ++ ")"
 
-      queryLeft = "SELECT i.* from items i, tags t, tag_map tm where "
-                   ++ "i.id = tm.item_id AND "
-                   ++ "tm.tag_id = t.id"
+      queryLeft = "SELECT i.* FROM items i, tags t, tag_map tm where i.id = tm.item_id AND tm.tag_id = t.id AND i.current_state < ?"
 
 displayItems :: [Item] -> IO ()
 displayItems = mapM_ (displayItemHelper 0)
@@ -113,21 +114,21 @@ displayItems = mapM_ (displayItemHelper 0)
    
 getTodoItems :: (IConnection c) => c -> String -> IO [Item]
 getTodoItems conn baseQuery = do
-   topLevels <- quickQuery' conn topLevelQuery [SqlNull]
+   topLevels <- quickQuery' conn topLevelQuery [toSql $ fromEnum StateDone, SqlNull]
    fmap sortItems $ mapM createChild topLevels
    where
       topLevelQuery = baseQuery ++ " AND i.parent_id is ?"
       childQuery = baseQuery ++ " AND i.parent_id = ?"
 
       createChild :: [SqlValue] -> IO Item
-      createChild [iid, ide, ica, _, ipr] = do
-         let this_id = fromSql iid :: Integer
-         children <- mapM createChild =<< quickQuery' conn childQuery [toSql this_id]
+      createChild [iId, iDescription, iStatus, iCreatedAt, _, iParent] = do
+         let this_id = fromSql iId :: Integer
+         children <- mapM createChild =<< quickQuery' conn childQuery [toSql $ fromEnum StateDone, toSql this_id]
          return Item
-                  { itemId = fromSql iid
-                  , itemDescription = fromSql ide
-                  , itemCreatedAt = fromSql ica
-                  , itemPriority = fromSql ipr
+                  { itemId = fromSql iId
+                  , itemDescription = fromSql iDescription
+                  , itemCreatedAt = fromSql iCreatedAt
+                  , itemPriority = fromSql iParent
                   , itemChildren = sortItems children
                   }
 
@@ -153,7 +154,7 @@ executeAddCommand config addFlags = do
       Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
       Just (comment, pri, tags) -> do
          conn <- getDatabaseConnection
-         run conn addInsertion [toSql comment, toSql (parent addFlags), toSql pri]
+         run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql (parent addFlags), toSql pri]
          itemId <- getLastId conn
          run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
          unless (null tags) $ do
@@ -181,8 +182,8 @@ executeAddCommand config addFlags = do
       putStrFlush s = putStr s >> hFlush stdout 
 
       addInsertion :: String
-      addInsertion = "INSERT INTO items (description, created_at, parent_id, priority)" ++ 
-                     "VALUES (?, datetime() ,?,?)"
+      addInsertion = "INSERT INTO items (description, current_state, created_at, parent_id, priority)" ++ 
+                     "VALUES (?, ?, datetime() ,?,?)"
 
 findOrCreateTags :: (IConnection c) => c -> Integer -> [String] -> IO [Integer]
 findOrCreateTags conn itemId = mapM findOrCreateTag
@@ -225,13 +226,14 @@ executeEditCommand config editCommand = do
             d <- runMaybeT $ getEditData conn id
             case d of
                Nothing -> putStrLn $ "Could not find data for id: " ++ show id
-               Just oldData@(_,_,oldTags) -> do 
+               Just oldData@(oldDesc,_,oldTags) -> do 
                   newData <- runInputT defaultSettings (runMaybeT (askEditQuestions oldData))
                   case newData of
                      Nothing -> putStrLn "Invalid input or early termination."
                      Just (desc, pri, tags) -> do 
                         -- TODO create an edit event here to log the change
                         run conn updateItem [toSql desc, toSql pri, toSql id]
+                        run conn "INSERT INTO item_events (item_id, item_event_type, event_description, occurred_at) VALUES (?,?,?, datetime())" [toSql id, toSql $ fromEnum EventEdit, toSql oldDesc]
                         cs <- prepare conn createStatement
                         ds <- prepare conn deleteStatement
                         findOrCreateTags conn id (tags \\ oldTags) >>= mapM_ (createTagMapping cs id)
@@ -306,14 +308,14 @@ executeDoneCommand config doneCommand = do
             [] -> return []
             mdrxs -> do 
                   existing <- fmap getListOfId $ quickQuery conn (existingItems mdrxs) []
-                  done <- fmap getListOfId $ quickQuery conn (alreadyDone mdrxs) [toSql $ fromEnum EventDone]
+                  done <- fmap getListOfId $ quickQuery conn (alreadyDone mdrxs) [toSql $ fromEnum StateDone]
                   return (existing \\ done)
                where 
                   getListOfId :: [[SqlValue]] -> [Integer]
                   getListOfId = map fromSql . map head
 
                   existingItems s = "SELECT i.id from items i WHERE " ++ rangeToSqlOr s
-                  alreadyDone s = "SELECT i.id from items i, item_events ie WHERE i.id = ie.item_id AND ie.item_event_type = ? AND (" ++ rangeToSqlOr s ++ ")"
+                  alreadyDone s = "SELECT i.id from items i WHERE i.current_state >= ? AND (" ++ rangeToSqlOr s ++ ")"
 
       markElementAsDone :: (IConnection c) => c -> Integer -> IO ()
       markElementAsDone conn itemId = do 
@@ -325,6 +327,7 @@ executeDoneCommand config doneCommand = do
                lift . putStrLn $ show itemId ++ ": " ++ description
                comment <- getInputLine "comment> "
                lift $ run conn "INSERT INTO item_events (item_id, item_event_type, event_description, occurred_at) VALUES (?, ?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventDone, toSql comment]
+               lift $ run conn "UPDATE items SET current_state = ? WHERE id = ?" [toSql $ fromEnum StateDone, toSql itemId]
                return ()
          
       rangeToSqlOr :: [Range Integer] -> String

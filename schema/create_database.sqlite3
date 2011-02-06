@@ -15,6 +15,7 @@ create table updates (
 create table items ( 
    id integer primary key autoincrement not null, 
    description text not null, 
+   current_state integer not null default 0,  -- because 0 will be the first element in the enum
    created_at datetime not null,
    parent_id integer,
    priority integer not null,
