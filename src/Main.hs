@@ -35,12 +35,19 @@ prettyShow :: (Show a) => a -> IO ()
 prettyShow = putStrLn . ppShow
 
 main = do
-   config <- defaultConfig
+   preConfig <- defaultConfig
+   command <- getCommandInput
+   let config = getUpdatedConfig command preConfig
    runReaderT setupAppDir config
    prettyShow config
-   command <- getCommandInput
    prettyShow command
    executeCommand config command
+
+getUpdatedConfig :: TodoCommand -> Config -> Config
+getUpdatedConfig command original = 
+   case databaseFile command of
+      Nothing -> original
+      Just file -> original { defaultDatabaseName = file }
 
 data EventTypes = EventAdd | EventEdit | EventDone | EventRemove
                 deriving(Enum, Eq, Show)
@@ -83,7 +90,7 @@ executeCommand c x@(Done {}) = executeDoneCommand c x
 
 executeShowCommand :: Config -> TodoCommand -> IO ()
 executeShowCommand config showFlags = do
-   conn <- getDatabaseConnection
+   conn <- getDatabaseConnection config
    unless (filter_str == "") $ print (getFilters filter_str)
    case showUsingTags showFlags of
       Nothing -> getTodoItems conn (generateQuery []) >>= displayItems
@@ -153,7 +160,7 @@ executeAddCommand config addFlags = do
    case d of
       Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
       Just (comment, pri, tags) -> do
-         conn <- getDatabaseConnection
+         conn <- getDatabaseConnection config
          run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql (parent addFlags), toSql pri]
          itemId <- getLastId conn
          run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
@@ -210,7 +217,7 @@ extractId _ = error "Could not parse id result."
 
 executeEditCommand :: Config -> TodoCommand -> IO ()
 executeEditCommand config editCommand = do
-   conn <- getDatabaseConnection
+   conn <- getDatabaseConnection config
    sequence_ . intersperse (putStrLn "") . map (editSingleId conn) . getEditRanges . editRanges $ editCommand
    commit conn
    disconnect conn
@@ -285,7 +292,7 @@ executeEditCommand config editCommand = do
 executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand config doneCommand = do
    -- Todo replace this with withConnection
-   conn <- getDatabaseConnection
+   conn <- getDatabaseConnection config
    getExistingElements conn mergedDoneRanges >>= mapM_ (markElementAsDone conn)
    commit conn
    disconnect conn
@@ -353,5 +360,5 @@ separateBy sep input = case parse parseCommas "(unknown)" input of
 separateCommas :: String -> Maybe [String]
 separateCommas = separateBy ','
 
-getDatabaseConnection :: IO Connection
-getDatabaseConnection = connectSqlite3 ".htodo.db"
+getDatabaseConnection :: Config -> IO Connection
+getDatabaseConnection = connectSqlite3 . defaultDatabaseName 
