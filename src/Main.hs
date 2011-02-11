@@ -280,13 +280,14 @@ executeEditCommand config editCommand = do
 
                askEditQuestions :: (String, Integer, [String]) -> MaybeT (InputT IO) (String, Integer, [String])
                askEditQuestions (desc, pri, tags) = do
-                  Just newDesc <- lift $ getInputLineDefault desc "comment> "
+                  Just newDesc <- lift $ getInputLineWithInitial "comment> " $ defInit desc
                   guard (not $ null newDesc)
-                  Just newPri <- lift $ getInputLineDefault (show pri) "priority> "
+                  Just newPri <- lift $ getInputLineWithInitial "priority> " . defInit $ show pri 
                   guard (not $ null newPri)
                   guard (all isDigit newPri) -- the priority must be a digit
-                  Just newTags <- lift $ getInputLineDefault (unwords tags) "tags> "
+                  Just newTags <- lift $ getInputLineWithInitial "tags> " . defInit $ unwords tags
                   return (newDesc, read newPri, nub . words $ newTags)
+                  where defInit a = (a, "")
                   
 
 executeDoneCommand :: Config -> TodoCommand -> IO ()
