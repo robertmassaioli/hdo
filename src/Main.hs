@@ -40,8 +40,8 @@ main = do
    command <- getCommandInput
    let config = getUpdatedConfig command preConfig
    --runReaderT setupAppDir config
-   {-prettyShow config-}
-   {-prettyShow command-}
+   prettyShow config
+   prettyShow command
    executeCommand config command
 
 getUpdatedConfig :: TodoCommand -> Config -> Config

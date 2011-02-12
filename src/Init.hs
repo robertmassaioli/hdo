@@ -13,11 +13,12 @@ createDatabase initCommand config = do
    case databaseFile initCommand of
       Nothing -> if userLevel initCommand
                      then runCreateDatabase $ defaultDatabaseLocation config
-                     else runCreateDatabase $ hiddenFileName config
+                     else runCreateDatabase $ defaultDatabaseName config
       Just databasePath -> runCreateDatabase databasePath
 
 runCreateDatabase :: String -> IO ()
 runCreateDatabase filename = do
+   putStrLn $ "Creating hTodo database: " ++ filename
    conn <- connectSqlite3 filename
    runRaw conn tableUpdates 
    runRaw conn tableItems

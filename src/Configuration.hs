@@ -22,7 +22,7 @@ defaultConfig :: IO Config
 defaultConfig = do 
    appDir <- getAppUserDataDirectory "htodo"
    return Config
-      { defaultDatabaseName = "htodo.db"
+      { defaultDatabaseName = ".htodo.db"
       , defaultAppDirectory = appDir
       , defaultSchemaDir = "./schema"
       }
@@ -59,10 +59,10 @@ searchPathForFile config paths = do
       xs -> return . Just . fst . head $ xs
    where    
       potentialLocations :: [FilePath]
-      potentialLocations = map (</> hiddenFileName config) paths ++ [defaultDatabaseLocation config]
+      potentialLocations = map (</> defaultDatabaseName config) paths ++ [defaultDatabaseLocation config]
 
 defaultDatabaseLocation :: Config -> FilePath
-defaultDatabaseLocation config = defaultAppDirectory config </> defaultDatabaseName config
+defaultDatabaseLocation config = defaultAppDirectory config </> (tail $ defaultDatabaseName config)
 
 hiddenFileName :: Config -> FilePath
 hiddenFileName config = '.' : defaultDatabaseName config
