@@ -38,9 +38,9 @@ main = do
    preConfig <- defaultConfig
    command <- getCommandInput
    let config = getUpdatedConfig command preConfig
-   runReaderT setupAppDir config
-   prettyShow config
-   prettyShow command
+   --runReaderT setupAppDir config
+   {-prettyShow config-}
+   {-prettyShow command-}
    executeCommand config command
 
 getUpdatedConfig :: TodoCommand -> Config -> Config
@@ -90,14 +90,17 @@ executeCommand c x@(Done {}) = executeDoneCommand c x
 
 executeShowCommand :: Config -> TodoCommand -> IO ()
 executeShowCommand config showFlags = do
-   conn <- getDatabaseConnection config
-   unless (filter_str == "") $ print (getFilters filter_str)
-   case showUsingTags showFlags of
-      Nothing -> getTodoItems conn (generateQuery []) >>= displayItems
-      Just x -> case separateCommas x of
-                  Nothing -> putStrLn "Invalid text was placed in the tags."
-                  Just x -> getTodoItems conn (generateQuery x) >>= displayItems
-   disconnect conn
+   mconn <- getDatabaseConnection config
+   case mconn of
+      Nothing -> return ()
+      Just conn -> do
+         unless (filter_str == "") $ print (getFilters filter_str)
+         case showUsingTags showFlags of
+            Nothing -> getTodoItems conn (generateQuery []) >>= displayItems
+            Just x -> case separateCommas x of
+                        Nothing -> putStrLn "Invalid text was placed in the tags."
+                        Just x -> getTodoItems conn (generateQuery x) >>= displayItems
+         disconnect conn
    where
       filter_str = intercalate "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
 
@@ -160,17 +163,20 @@ executeAddCommand config addFlags = do
    case d of
       Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
       Just (comment, pri, tags) -> do
-         conn <- getDatabaseConnection config
-         run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql (parent addFlags), toSql pri]
-         itemId <- getLastId conn
-         run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
-         unless (null tags) $ do
-            tagIds <- findOrCreateTags conn itemId tags
-            insertStatement <- prepare conn "INSERT INTO tag_map (item_id, tag_id, created_at) VALUES (?,?, datetime())"
-            mapM_ (execute insertStatement) [[toSql itemId, tag] | tag <- map toSql tagIds]
-         commit conn
-         disconnect conn
-         putStrLn $ "Added item " ++ show itemId ++ " successfully."
+         mconn <- getDatabaseConnection config
+         case mconn of
+            Nothing -> return ()
+            Just conn -> do
+               run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql (parent addFlags), toSql pri]
+               itemId <- getLastId conn
+               run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
+               unless (null tags) $ do
+                  tagIds <- findOrCreateTags conn itemId tags
+                  insertStatement <- prepare conn "INSERT INTO tag_map (item_id, tag_id, created_at) VALUES (?,?, datetime())"
+                  mapM_ (execute insertStatement) [[toSql itemId, tag] | tag <- map toSql tagIds]
+               commit conn
+               disconnect conn
+               putStrLn $ "Added item " ++ show itemId ++ " successfully."
    where 
 
       getData :: IO (Maybe (String, String, [String]))
@@ -217,10 +223,13 @@ extractId _ = error "Could not parse id result."
 
 executeEditCommand :: Config -> TodoCommand -> IO ()
 executeEditCommand config editCommand = do
-   conn <- getDatabaseConnection config
-   sequence_ . intersperse (putStrLn "") . map (editSingleId conn) . getEditRanges . editRanges $ editCommand
-   commit conn
-   disconnect conn
+   mconn <- getDatabaseConnection config
+   case mconn of
+      Nothing -> return ()
+      Just conn -> do
+         sequence_ . intersperse (putStrLn "") . map (editSingleId conn) . getEditRanges . editRanges $ editCommand
+         commit conn
+         disconnect conn
       where
          getEditRanges :: String -> [Integer]
          getEditRanges input = case parse (parseRanges ',') "(edit_ranges)" input of
@@ -293,10 +302,13 @@ executeEditCommand config editCommand = do
 executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand config doneCommand = do
    -- Todo replace this with withConnection
-   conn <- getDatabaseConnection config
-   getExistingElements conn mergedDoneRanges >>= mapM_ (markElementAsDone conn)
-   commit conn
-   disconnect conn
+   mconn <- getDatabaseConnection config
+   case mconn of
+      Nothing -> return ()
+      Just conn -> do
+         getExistingElements conn mergedDoneRanges >>= mapM_ (markElementAsDone conn)
+         commit conn
+         disconnect conn
    where
       printDone :: [Integer] -> IO [Integer]
       printDone xs = do 
@@ -360,35 +372,3 @@ separateBy sep input = case parse parseCommas "(unknown)" input of
 
 separateCommas :: String -> Maybe [String]
 separateCommas = separateBy ','
-
-getDatabaseConnection :: Config -> IO Connection
-getDatabaseConnection = connectSqlite3 . defaultDatabaseName 
-
-
-findHTodoDatabase :: Config -> IO (Maybe FilePath)
-findHTodoDatabase config = do
-   current <- getCurrentDirectory
-   home <- getHomeDirectory
-   searchPathForFile config . generateSearchPath $ makeRelative home current
-
-generateSearchPath :: FilePath -> [FilePath]
-generateSearchPath a = a : if takeDirectory a /= a 
-                              then generateSearchPath (takeDirectory a) 
-                              else []
-
--- it adds on the default path for you
-searchPathForFile :: Config -> [FilePath] -> IO (Maybe FilePath)
-searchPathForFile config paths = do
-   results <- mapM doesFileExist potentialLocations
-   case filter (\s -> snd s == True) $ zip potentialLocations results of
-      [] -> return Nothing
-      xs -> return . Just . fst . head $ xs
-   where    
-      potentialLocations :: [FilePath]
-      potentialLocations = map (</> hiddenFileName) paths ++ defaultLocation
-         where 
-            defaultLocation = [defaultAppDirectory config </> defaultDatabaseName config]
-            hiddenFileName = '.' : defaultDatabaseName config
-
-      makeTuple :: (a -> b) -> a -> (a, b)
-      makeTuple f a = (a, f a)
