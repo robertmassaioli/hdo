@@ -18,15 +18,19 @@ createDatabase initCommand config = do
 
 runCreateDatabase :: String -> IO ()
 runCreateDatabase filename = do
-   putStrLn $ "Creating hTodo database: " ++ filename
-   conn <- connectSqlite3 filename
-   runRaw conn tableUpdates 
-   runRaw conn tableItems
-   runRaw conn tableItemEvents
-   runRaw conn tableTags
-   runRaw conn tableTagMap
-   commit conn
-   disconnect conn
+   exist <- doesFileExist filename
+   if exist
+      then putStrLn $ "Database at '" ++ filename ++ "' already exists. Doing nothing."
+      else do
+         putStrLn $ "Creating hTodo database: " ++ filename
+         conn <- connectSqlite3 filename
+         runRaw conn tableUpdates 
+         runRaw conn tableItems
+         runRaw conn tableItemEvents
+         runRaw conn tableTags
+         runRaw conn tableTagMap
+         commit conn
+         disconnect conn
    
 tableUpdates = "create table updates ( version integer primary key, description text, upgradeDate date );"
 
