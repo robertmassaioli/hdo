@@ -3,6 +3,8 @@ module Configuration
    , defaultConfig
    , getDatabaseConnection
    , findHTodoDatabase
+   , defaultDatabaseLocation
+   , hiddenFileName
    ) where
 
 import System.Directory
@@ -29,7 +31,7 @@ getDatabaseConnection :: Config -> IO (Maybe Connection)
 getDatabaseConnection config = do
    path <- findHTodoDatabase config 
    case path of
-      Nothing -> putStrLn "Could not find hTodo database in path." >> return Nothing
+      Nothing -> putStrLn "Could not find hTodo database in path. Maybe you should try 'htodo init' to start a new todo in the current directory?" >> return Nothing
       Just validPath -> do
          putStrLn $ "Using database: " ++ validPath
          connectSqlite3 validPath >>= return . Just
@@ -54,10 +56,10 @@ searchPathForFile config paths = do
       xs -> return . Just . fst . head $ xs
    where    
       potentialLocations :: [FilePath]
-      potentialLocations = map (</> hiddenFileName) paths ++ defaultLocation
-         where 
-            defaultLocation = [defaultAppDirectory config </> defaultDatabaseName config]
-            hiddenFileName = '.' : defaultDatabaseName config
+      potentialLocations = map (</> hiddenFileName config) paths ++ [defaultDatabaseLocation config]
 
-      makeTuple :: (a -> b) -> a -> (a, b)
-      makeTuple f a = (a, f a)
+defaultDatabaseLocation :: Config -> FilePath
+defaultDatabaseLocation config = defaultAppDirectory config </> defaultDatabaseName config
+
+hiddenFileName :: Config -> FilePath
+hiddenFileName config = '.' : defaultDatabaseName config

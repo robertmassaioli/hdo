@@ -28,6 +28,7 @@ import Filter
 import TodoArguments
 import Configuration
 import Range
+import Init
 
 -- Use Haskeline for tde!!!
 
@@ -62,15 +63,15 @@ setupAppDir = do
       appDirExists <- doesDirectoryExist (defaultAppDirectory config)
       unless appDirExists $ do
          createDirectory (defaultAppDirectory config)
-         createDatabase 
+         createDatabaseOld
             (defaultAppDirectory config </> defaultDatabaseName config) 
             (defaultSchemaDir config </> create_file)
    where
       create_file :: FilePath
       create_file = "create_database.sqlite3.read"
 
-createDatabase :: FilePath -> FilePath -> IO ()
-createDatabase databaseFile schemaFile = do
+createDatabaseOld :: FilePath -> FilePath -> IO ()
+createDatabaseOld databaseFile schemaFile = do
    conn <- connectSqlite3 databaseFile
    putStrLn databaseFile
    createCommands <- readFile schemaFile
@@ -92,7 +93,7 @@ executeShowCommand :: Config -> TodoCommand -> IO ()
 executeShowCommand config showFlags = do
    mconn <- getDatabaseConnection config
    case mconn of
-      Nothing -> return ()
+      Nothing -> gracefulExit
       Just conn -> do
          unless (filter_str == "") $ print (getFilters filter_str)
          case showUsingTags showFlags of
@@ -155,7 +156,7 @@ data Item = Item
    deriving(Show, Eq)
 
 executeInitCommand :: Config -> TodoCommand -> IO ()
-executeInitCommand config showFlags = unimplemented
+executeInitCommand config initFlags = createDatabase initFlags config
 
 executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config addFlags = do
@@ -165,7 +166,7 @@ executeAddCommand config addFlags = do
       Just (comment, pri, tags) -> do
          mconn <- getDatabaseConnection config
          case mconn of
-            Nothing -> return ()
+            Nothing -> gracefulExit
             Just conn -> do
                run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql (parent addFlags), toSql pri]
                itemId <- getLastId conn
@@ -225,7 +226,7 @@ executeEditCommand :: Config -> TodoCommand -> IO ()
 executeEditCommand config editCommand = do
    mconn <- getDatabaseConnection config
    case mconn of
-      Nothing -> return ()
+      Nothing -> gracefulExit
       Just conn -> do
          sequence_ . intersperse (putStrLn "") . map (editSingleId conn) . getEditRanges . editRanges $ editCommand
          commit conn
@@ -298,13 +299,15 @@ executeEditCommand config editCommand = do
                   return (newDesc, read newPri, nub . words $ newTags)
                   where defInit a = (a, "")
                   
+gracefulExit :: IO ()
+gracefulExit = putStrLn "hTodo shutdown gracefully."
 
 executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand config doneCommand = do
    -- Todo replace this with withConnection
    mconn <- getDatabaseConnection config
    case mconn of
-      Nothing -> return ()
+      Nothing -> gracefulExit
       Just conn -> do
          getExistingElements conn mergedDoneRanges >>= mapM_ (markElementAsDone conn)
          commit conn
