@@ -18,8 +18,8 @@ import Text.Parsec.Token
 
 import Text.Show.Pretty
 
-import System.Directory(doesDirectoryExist, createDirectory)
-import System.FilePath( (</>) )
+import System.Directory
+import System.FilePath
 import System.IO(hFlush, stdout)
 
 import System.Console.Haskeline
@@ -363,3 +363,32 @@ separateCommas = separateBy ','
 
 getDatabaseConnection :: Config -> IO Connection
 getDatabaseConnection = connectSqlite3 . defaultDatabaseName 
+
+
+findHTodoDatabase :: Config -> IO (Maybe FilePath)
+findHTodoDatabase config = do
+   current <- getCurrentDirectory
+   home <- getHomeDirectory
+   searchPathForFile config . generateSearchPath $ makeRelative home current
+
+generateSearchPath :: FilePath -> [FilePath]
+generateSearchPath a = a : if takeDirectory a /= a 
+                              then generateSearchPath (takeDirectory a) 
+                              else []
+
+-- it adds on the default path for you
+searchPathForFile :: Config -> [FilePath] -> IO (Maybe FilePath)
+searchPathForFile config paths = do
+   results <- mapM doesFileExist potentialLocations
+   case filter (\s -> snd s == True) $ zip potentialLocations results of
+      [] -> return Nothing
+      xs -> return . Just . fst . head $ xs
+   where    
+      potentialLocations :: [FilePath]
+      potentialLocations = map (</> hiddenFileName) paths ++ defaultLocation
+         where 
+            defaultLocation = [defaultAppDirectory config </> defaultDatabaseName config]
+            hiddenFileName = '.' : defaultDatabaseName config
+
+      makeTuple :: (a -> b) -> a -> (a, b)
+      makeTuple f a = (a, f a)
