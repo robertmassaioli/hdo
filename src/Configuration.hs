@@ -40,12 +40,15 @@ findHTodoDatabase :: Config -> IO (Maybe FilePath)
 findHTodoDatabase config = do
    current <- getCurrentDirectory
    home <- getHomeDirectory
-   searchPathForFile config . generateSearchPath $ makeRelative home current
+   searchPathForFile config $ generateSearchPath home current
 
-generateSearchPath :: FilePath -> [FilePath]
-generateSearchPath a = a : if takeDirectory a /= a 
-                              then generateSearchPath (takeDirectory a) 
-                              else []
+generateSearchPath :: FilePath -> FilePath -> [FilePath]
+generateSearchPath home initial = go initial
+   where 
+      go :: FilePath -> [FilePath]
+      go a = a : if takeDirectory a /= a && a /= home
+                     then go $ takeDirectory a
+                     else []
 
 -- it adds on the default path for you
 searchPathForFile :: Config -> [FilePath] -> IO (Maybe FilePath)
