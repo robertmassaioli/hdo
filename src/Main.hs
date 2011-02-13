@@ -13,8 +13,6 @@ import Data.Ord(comparing)
 import Data.Char (isDigit)
 
 import Text.Parsec
-import Text.Parsec.String
-import Text.Parsec.Token
 
 import Text.Show.Pretty
 
@@ -29,6 +27,7 @@ import TodoArguments
 import Configuration
 import Range
 import Init
+import Util
 
 -- Use Haskeline for tde!!!
 
@@ -283,9 +282,6 @@ executeEditCommand config editCommand = do
                   return (newDesc, read newPri, nub . words $ newTags)
                   where defInit a = (a, "")
                   
-gracefulExit :: IO ()
-gracefulExit = putStrLn "hTodo shutdown gracefully."
-
 executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand config doneCommand = do
    -- Todo replace this with withConnection
@@ -344,18 +340,3 @@ executeDoneCommand config doneCommand = do
             toSqlHelper [] = []
             toSqlHelper (SpanRange x y:xs) = ("(" ++ show x ++ " <= i.id AND i.id <= " ++ show y ++ ")") : toSqlHelper xs
             toSqlHelper (SingletonRange x:xs) = (show x ++ " = i.id") : toSqlHelper xs
-
-
-
-unimplemented = putStrLn "Not Implemented Yet"
-
-separateBy :: Char -> String -> Maybe [String]
-separateBy sep input = case parse parseCommas "(unknown)" input of
-   Left _ -> Nothing
-   Right x -> Just x
-   where
-      parseCommas :: Parser [String]
-      parseCommas = sepBy (many1 (noneOf [sep])) (char sep)
-
-separateCommas :: String -> Maybe [String]
-separateCommas = separateBy ','
