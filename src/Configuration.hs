@@ -11,10 +11,11 @@ import System.Directory
 import System.FilePath
 import Database.HDBC.Sqlite3
 
+import TodoArguments
+
 data Config = Config 
    { defaultDatabaseName :: String
    , defaultAppDirectory :: FilePath
-   , defaultSchemaDir :: FilePath
    }
    deriving(Show)
 
@@ -24,17 +25,21 @@ defaultConfig = do
    return Config
       { defaultDatabaseName = ".htodo.db"
       , defaultAppDirectory = appDir
-      , defaultSchemaDir = "./schema"
       }
 
-getDatabaseConnection :: Config -> IO (Maybe Connection)
-getDatabaseConnection config = do
-   path <- findHTodoDatabase config 
+getDatabaseConnection :: Config -> TodoCommand -> IO (Maybe Connection)
+getDatabaseConnection config command = do
+   path <- if userLevel command
+               then findHomeDatabase
+               else findHTodoDatabase config 
    case path of
       Nothing -> putStrLn "Could not find hTodo database in path. Maybe you should try 'htodo init' to start a new todo in the current directory?" >> return Nothing
       Just validPath -> do
          putStrLn $ "Using database: " ++ validPath
          connectSqlite3 validPath >>= return . Just
+   where
+      findHomeDatabase :: IO (Maybe FilePath)
+      findHomeDatabase = searchPathForFile config []
 
 findHTodoDatabase :: Config -> IO (Maybe FilePath)
 findHTodoDatabase config = do

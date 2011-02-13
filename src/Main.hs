@@ -40,8 +40,9 @@ main = do
    command <- getCommandInput
    let config = getUpdatedConfig command preConfig
    --runReaderT setupAppDir config
-   prettyShow config
-   prettyShow command
+   {-prettyShow config-}
+   {-prettyShow command-}
+   setupAppDir config
    executeCommand config command
 
 getUpdatedConfig :: TodoCommand -> Config -> Config
@@ -56,31 +57,12 @@ data EventTypes = EventAdd | EventEdit | EventDone | EventRemove
 data ItemState = StateNotDone | StateDone
                deriving(Enum, Eq, Show)
 
-setupAppDir :: ReaderT Config IO ()
-setupAppDir = do
-   config <- ask
-   liftIO $ do
-      appDirExists <- doesDirectoryExist (defaultAppDirectory config)
-      unless appDirExists $ do
-         createDirectory (defaultAppDirectory config)
-         createDatabaseOld
-            (defaultAppDirectory config </> defaultDatabaseName config) 
-            (defaultSchemaDir config </> create_file)
-   where
-      create_file :: FilePath
-      create_file = "create_database.sqlite3.read"
-
-createDatabaseOld :: FilePath -> FilePath -> IO ()
-createDatabaseOld databaseFile schemaFile = do
-   conn <- connectSqlite3 databaseFile
-   putStrLn databaseFile
-   createCommands <- readFile schemaFile
-   withTransaction conn (createEverything createCommands)
-   disconnect conn
-   where
-      createEverything :: (IConnection conn) => String -> conn -> IO ()
-      createEverything createCommands conn = mapM_ (quickQuery'' conn) . lines $ createCommands
-         where quickQuery'' conn qry = quickQuery' conn qry []
+setupAppDir :: Config -> IO ()
+setupAppDir config = do
+   appDirExists <- doesDirectoryExist (defaultAppDirectory config)
+   unless appDirExists $ do 
+      createDirectory (defaultAppDirectory config)
+      putStrLn $ "Created app data directory: " ++ defaultAppDirectory config
 
 executeCommand :: Config -> TodoCommand -> IO ()
 executeCommand c x@(Show {}) = executeShowCommand c x
@@ -91,7 +73,7 @@ executeCommand c x@(Done {}) = executeDoneCommand c x
 
 executeShowCommand :: Config -> TodoCommand -> IO ()
 executeShowCommand config showFlags = do
-   mconn <- getDatabaseConnection config
+   mconn <- getDatabaseConnection config showFlags
    case mconn of
       Nothing -> gracefulExit
       Just conn -> do
@@ -160,11 +142,11 @@ executeInitCommand config initFlags = createDatabase initFlags config
 
 executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config addFlags = do
-   d <- getData
+   d <- getData addFlags
    case d of
       Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
       Just (comment, pri, tags) -> do
-         mconn <- getDatabaseConnection config
+         mconn <- getDatabaseConnection config addFlags
          case mconn of
             Nothing -> gracefulExit
             Just conn -> do
@@ -180,14 +162,16 @@ executeAddCommand config addFlags = do
                putStrLn $ "Added item " ++ show itemId ++ " successfully."
    where 
 
-      getData :: IO (Maybe (String, String, [String]))
-      getData = runInputT defaultSettings (runMaybeT getDataHelper)
+      getData :: TodoCommand -> IO (Maybe (String, String, [String]))
+      getData addCommand = runInputT defaultSettings (runMaybeT getDataHelper)
          where
             getDataHelper :: MaybeT (InputT IO) (String, String, [String])
             getDataHelper = do
                Just description <- lift $ getInputLine "comment> "
                guard (not $ null description)
-               Just pri <- lift $ getInputLine "priority> "
+               Just pri <- lift $ case priority addCommand of
+                  Nothing -> getInputLine "priority> "
+                  Just pri -> getInputLineWithInitial "priority> " (show pri, "")
                guard (not $ null pri)
                Just tags <- lift $ getInputLine "tags> "
                return (description, pri, words tags)
@@ -224,7 +208,7 @@ extractId _ = error "Could not parse id result."
 
 executeEditCommand :: Config -> TodoCommand -> IO ()
 executeEditCommand config editCommand = do
-   mconn <- getDatabaseConnection config
+   mconn <- getDatabaseConnection config editCommand
    case mconn of
       Nothing -> gracefulExit
       Just conn -> do
@@ -305,7 +289,7 @@ gracefulExit = putStrLn "hTodo shutdown gracefully."
 executeDoneCommand :: Config -> TodoCommand -> IO ()
 executeDoneCommand config doneCommand = do
    -- Todo replace this with withConnection
-   mconn <- getDatabaseConnection config
+   mconn <- getDatabaseConnection config doneCommand
    case mconn of
       Nothing -> gracefulExit
       Just conn -> do

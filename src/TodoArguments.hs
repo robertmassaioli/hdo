@@ -9,7 +9,8 @@ import System.Console.CmdArgs.Implicit
 
 data TodoCommand 
             = Show
-               { showEntireHierarchy :: Bool
+               { userLevel :: Bool
+               , showEntireHierarchy :: Bool
                , showDone :: Bool
                , showUsingFilter :: Maybe String
                , showUsingTags :: Maybe String
@@ -21,17 +22,20 @@ data TodoCommand
                , databaseFile :: Maybe FilePath
                }
             | Add 
-               { fromFile :: Maybe FilePath 
+               { userLevel :: Bool
+               , fromFile :: Maybe FilePath 
                , priority :: Maybe Integer
                , databaseFile :: Maybe FilePath
                , parent :: Maybe Integer
                }
             | Done 
-               { databaseFile :: Maybe FilePath
+               { userLevel :: Bool
+               , databaseFile :: Maybe FilePath
                , doneRanges :: String
                }
             | Edit 
-               { editRanges :: String 
+               { userLevel :: Bool
+               , editRanges :: String 
                , databaseFile :: Maybe FilePath
                }
             deriving(Eq, Show, Data, Typeable)
@@ -58,7 +62,12 @@ combinedModes = modes
 
 showMode :: TodoCommand
 showMode = Show 
-            { showEntireHierarchy = def 
+            { userLevel = False  
+               &= explicit
+               &= name "for-user" &= name "u"
+               &= help ("Specifies whether or not this is for the user or the current directory." 
+                         ++ " Current directory is used by default.")
+            , showEntireHierarchy = def 
                &= explicit
                &= name "a" &= name "all"
                &= help "Show the entire hierarchy of the todo list items."
@@ -99,8 +108,8 @@ initMode :: TodoCommand
 initMode = Init 
             { userLevel = False  
                &= explicit
-               &= name "for-user"
-               &= help ("Specifies wether or not this is for the user or the current directory." 
+               &= name "for-user" &= name "u"
+               &= help ("Specifies whether or not this is for the user or the current directory." 
                          ++ " Current directory is used by default.")
             , databaseFile = def
                &= explicit
@@ -116,7 +125,12 @@ initMode = Init
 
 addMode :: TodoCommand
 addMode = Add 
-            { fromFile = Nothing &= explicit 
+            { userLevel = False  
+               &= explicit
+               &= name "for-user" &= name "u"
+               &= help ("Specifies whether or not this is for the user or the current directory." 
+                         ++ " Current directory is used by default.")
+            , fromFile = Nothing &= explicit 
                                  &= name "from-file" 
                                  &= help "Add a bunch of todo items from a file."
                                  &= typ "<file_name>"
@@ -146,7 +160,12 @@ addMode = Add
 
 doneMode :: TodoCommand
 doneMode = Done 
-            { doneRanges = def &= args
+            { userLevel = False  
+               &= explicit
+               &= name "for-user" &= name "u"
+               &= help ("Specifies whether or not this is for the user or the current directory." 
+                         ++ " Current directory is used by default.")
+            , doneRanges = def &= args
             , databaseFile = def
                &= explicit
                &= name "d" &= name "database"
@@ -162,7 +181,12 @@ doneMode = Done
 
 editMode :: TodoCommand 
 editMode = Edit 
-            { editRanges = [] &= args
+            { userLevel = False  
+               &= explicit
+               &= name "for-user" &= name "u"
+               &= help ("Specifies whether or not this is for the user or the current directory." 
+                         ++ " Current directory is used by default.")
+            , editRanges = [] &= args
             , databaseFile = def 
                &= explicit
                &= name "d" &= name "database"
