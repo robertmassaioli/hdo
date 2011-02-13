@@ -9,6 +9,7 @@ module Filter
 import Text.Parsec
 import Text.Parsec.String
 import Range
+import DataTypes
 
 data FilterType 
    = FilterTypeAdd 

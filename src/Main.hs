@@ -6,7 +6,6 @@ import Data.Maybe (catMaybes, fromMaybe)
 
 import Database.HDBC
 import Database.HDBC.Sqlite3
-import Data.Time (LocalTime)
 import Data.List(sortBy, (\\), nub, intercalate, intersperse)
 import Data.Ord(comparing)
 
@@ -28,6 +27,7 @@ import Configuration
 import Range
 import Init
 import Util
+import DataTypes
 
 -- Use Haskeline for tde!!!
 
@@ -126,15 +126,6 @@ getTodoItems conn baseQuery = do
 
       sortItems :: [Item] -> [Item]
       sortItems = sortBy $ \x y -> comparing itemPriority x y
-
-data Item = Item
-   { itemId :: Integer
-   , itemDescription :: String
-   , itemCreatedAt :: LocalTime
-   , itemPriority :: Integer
-   , itemChildren :: [Item]
-   }
-   deriving(Show, Eq)
 
 executeInitCommand :: Config -> TodoCommand -> IO ()
 executeInitCommand config initFlags = createDatabase initFlags config
