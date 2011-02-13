@@ -315,7 +315,7 @@ executeDoneCommand config doneCommand = do
                   return (existing \\ done)
                where 
                   getListOfId :: [[SqlValue]] -> [Integer]
-                  getListOfId = map fromSql . map head
+                  getListOfId = map $ fromSql . head
 
                   existingItems s = "SELECT i.id from items i WHERE " ++ rangeToSqlOr s
                   alreadyDone s = "SELECT i.id from items i WHERE i.current_state >= ? AND (" ++ rangeToSqlOr s ++ ")"

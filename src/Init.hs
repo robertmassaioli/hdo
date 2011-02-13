@@ -9,7 +9,7 @@ import Database.HDBC
 import Database.HDBC.Sqlite3
 
 createDatabase :: TodoCommand -> Config -> IO ()
-createDatabase initCommand config = do
+createDatabase initCommand config =
    case databaseFile initCommand of
       Nothing -> if userLevel initCommand
                      then runCreateDatabase $ defaultDatabaseLocation config

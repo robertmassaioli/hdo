@@ -36,7 +36,7 @@ getDatabaseConnection config command = do
       Nothing -> putStrLn "Could not find hTodo database in path. Maybe you should try 'htodo init' to start a new todo in the current directory?" >> return Nothing
       Just validPath -> do
          putStrLn $ "Using database: " ++ validPath
-         connectSqlite3 validPath >>= return . Just
+         fmap Just $ connectSqlite3 validPath
    where
       findHomeDatabase :: IO (Maybe FilePath)
       findHomeDatabase = searchPathForFile config []
@@ -59,7 +59,7 @@ generateSearchPath home initial = go initial
 searchPathForFile :: Config -> [FilePath] -> IO (Maybe FilePath)
 searchPathForFile config paths = do
    results <- mapM doesFileExist potentialLocations
-   case filter (\s -> snd s == True) $ zip potentialLocations results of
+   case filter snd $ zip potentialLocations results of
       [] -> return Nothing
       xs -> return . Just . fst . head $ xs
    where    
@@ -67,7 +67,7 @@ searchPathForFile config paths = do
       potentialLocations = map (</> defaultDatabaseName config) paths ++ [defaultDatabaseLocation config]
 
 defaultDatabaseLocation :: Config -> FilePath
-defaultDatabaseLocation config = defaultAppDirectory config </> (tail $ defaultDatabaseName config)
+defaultDatabaseLocation config = defaultAppDirectory config </> tail (defaultDatabaseName config)
 
 hiddenFileName :: Config -> FilePath
 hiddenFileName config = '.' : defaultDatabaseName config
