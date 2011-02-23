@@ -4,3 +4,4 @@ drop table tag_map;
 drop table tags;
 drop table item_events;
 drop table items;
+drop table lists;

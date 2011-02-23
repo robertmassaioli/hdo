@@ -11,15 +11,24 @@ create table updates (
    upgradeDate date
    );
 
+create table lists (
+   id integer primary key autoincrement not null,
+   name text not null,
+   hidden INT2 not null,
+   created_at datetime not null,
+   parent_id integer, -- it can have no parent
+   FOREIGN KEY(parent_id) references lists(id) on delete cascade
+   );
+
 -- This is the primary database of the program. It contains the todo items themselves.
 create table items ( 
    id integer primary key autoincrement not null, 
+   list_id integer,
    description text not null, 
    current_state integer not null default 0,  -- because 0 will be the first element in the enum
    created_at datetime not null,
-   parent_id integer,
-   priority integer not null,
-   FOREIGN KEY(parent_id) references items(id) on delete cascade
+   due_date datetime,  -- it can have no due date
+   FOREIGN KEY(list_id) references lists(id) on delete cascade
    );
 
 -- This table records the changes to the todo items.
