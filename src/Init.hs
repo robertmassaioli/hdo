@@ -25,6 +25,8 @@ runCreateDatabase filename = do
          putStrLn $ "Creating hTodo database: " ++ filename
          conn <- connectSqlite3 filename
          runRaw conn tableUpdates 
+         runRaw conn tableLists
+         runRaw conn insertMainList
          runRaw conn tableItems
          runRaw conn tableItemEvents
          runRaw conn tableTags
@@ -32,16 +34,29 @@ runCreateDatabase filename = do
          commit conn
          disconnect conn
    
+insertMainList = "INSERT INTO lists (id,name,hidden,created_at,parent_id) VALUES (1, 'Main', 0, datetime(), null)"
+
 tableUpdates = "create table updates ( version integer primary key, description text, upgradeDate date );"
+
+tableLists = 
+   "create table lists ("
+    ++ "id integer primary key autoincrement not null,"
+    ++ "name text not null,"
+    ++ "hidden INT2 not null,"
+    ++ "created_at datetime not null,"
+    ++ "parent_id integer,"
+    ++ "FOREIGN KEY(parent_id) references lists(id) on delete cascade"
+    ++ ");"
 
 tableItems = "create table items ("
               ++ "id integer primary key autoincrement not null,"
+              ++ "list_id integer not null,"
               ++ "description text not null,"
               ++ "current_state integer not null default 0,"
               ++ "created_at datetime not null,"
-              ++ "parent_id integer,"
               ++ "priority integer not null,"
-              ++ "FOREIGN KEY(parent_id) references items(id) on delete cascade"
+              ++ "due_date datetime,"
+              ++ "FOREIGN KEY(list_id) references listts(id) on delete cascade"
               ++ ");"
 
 tableItemEvents = "create table item_events ("

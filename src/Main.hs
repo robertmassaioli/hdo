@@ -89,9 +89,7 @@ executeShowCommand config showFlags = do
 
       generateQuery :: [String] -> String
       generateQuery [] = "SELECT i.* FROM items i where i.current_state < ? "
-      generateQuery xs = queryLeft ++ " AND (" 
-                         ++ (intercalate " OR " . map (\s -> "t.tag_name = \"" ++ s ++ "\"") $ xs)
-                         ++ ")"
+      generateQuery xs = queryLeft ++ " AND (" ++ createOrList "t.tag_name =" xs ++ ")"
 
       getSingleValue :: [[SqlValue]] -> Int
       getSingleValue [[x]] = length . show $ getInt 
@@ -113,6 +111,21 @@ displayItems maxLen = mapM_ (displayItemHelper 0)
             where
                itemString = show (itemId item)
                spacesLen = take (1 + maxLen - (length itemString)) $ repeat ' '
+
+createListType :: (Show a) => String -> String -> [a] -> String
+createListType comb prefix values = 
+   intercalate (" " ++ comb ++ " ") $ zipWith joinFunc (repeat prefix) (fmap show values)
+   where 
+      joinFunc a b = a ++ " " ++ b
+
+surround :: a -> [a] -> [a]
+surround a xs = [a] ++ xs ++ [a]
+
+createOrList :: (Show a) => String -> [a] -> String
+createOrList = createListType "OR"
+
+createAndList :: (Show a) => String -> [a] -> String
+createAndList = createListType "AND"
    
 getTodoItems :: (IConnection c) => c -> String -> IO [Item]
 getTodoItems conn baseQuery = do
