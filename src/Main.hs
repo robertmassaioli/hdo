@@ -77,11 +77,12 @@ executeShowCommand config showFlags = do
       Nothing -> gracefulExit
       Just conn -> do
          unless (filter_str == "") $ print (getFilters filter_str)
+         maxId <- fmap getSingleValue $ quickQuery' conn "select max(id) from items;" []
          case showUsingTags showFlags of
-            Nothing -> getTodoItems conn (generateQuery []) >>= displayItems
+            Nothing -> getTodoItems conn (generateQuery []) >>= displayItems maxId
             Just x -> case separateCommas x of
                         Nothing -> putStrLn "Invalid text was placed in the tags."
-                        Just x -> getTodoItems conn (generateQuery x) >>= displayItems
+                        Just x -> getTodoItems conn (generateQuery x) >>= displayItems maxId
          disconnect conn
    where
       filter_str = intercalate "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
@@ -92,17 +93,26 @@ executeShowCommand config showFlags = do
                          ++ (intercalate " OR " . map (\s -> "t.tag_name = \"" ++ s ++ "\"") $ xs)
                          ++ ")"
 
+      getSingleValue :: [[SqlValue]] -> Int
+      getSingleValue [[x]] = length . show $ getInt 
+         where getInt :: Int
+               getInt = fromSql x
+      getSingleValue _ = 1
+
       queryLeft = "SELECT i.* FROM items i, tags t, tag_map tm where i.id = tm.item_id AND tm.tag_id = t.id AND i.current_state < ?"
 
-displayItems :: [Item] -> IO ()
-displayItems = mapM_ (displayItemHelper 0)
+displayItems :: Int -> [Item] -> IO ()
+displayItems maxLen = mapM_ (displayItemHelper 0)
    where
       displayItemHelper :: Int -> Item -> IO ()
       displayItemHelper level item = do
          putStr $ replicate (level * 3 + 1) ' '
-         putStr $ show (itemId item) ++ ". "
+         putStr $ show (itemId item) ++ "." ++ spacesLen
          putStrLn $ itemDescription item
          mapM_ (displayItemHelper (level + 1)) (itemChildren item)
+            where
+               itemString = show (itemId item)
+               spacesLen = take (1 + maxLen - (length itemString)) $ repeat ' '
    
 getTodoItems :: (IConnection c) => c -> String -> IO [Item]
 getTodoItems conn baseQuery = do
@@ -229,6 +239,7 @@ executeEditCommand config editCommand = do
                         ds <- prepare conn deleteStatement
                         findOrCreateTags conn id (tags \\ oldTags) >>= mapM_ (createTagMapping cs id)
                         getTagMapIds conn id (oldTags \\ tags) >>= mapM_ (deleteTagMapping ds id)
+                        putStrLn $ "Successfully updated item " ++ show id ++ "."
                         -- please note that we intentionally do not delete tags here; just the
                         -- mappings, we leave them around for later use. The 'htodo clean' or maybe
                         -- 'htodo gc' command will do that cleanup I think.
