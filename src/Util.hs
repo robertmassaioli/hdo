@@ -1,8 +1,14 @@
 module Util where
 
+import Database.HDBC
+
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Token
+import Text.Show.Pretty
+
+prettyShow :: (Show a) => a -> IO ()
+prettyShow = putStrLn . ppShow
 
 separateBy :: Char -> String -> Maybe [String]
 separateBy sep input = 
@@ -21,3 +27,26 @@ separateCommas = separateBy ','
 -- could find.
 gracefulExit :: IO ()
 gracefulExit = putStrLn "hTodo shutdown gracefully."
+
+getLastId :: (IConnection c) => c -> IO Integer
+getLastId conn = fmap extractIntegerOrDie $ quickQuery' conn "select last_insert_rowid()" []
+   where
+      extractIntegerOrDie :: [[SqlValue]] -> Integer
+      extractIntegerOrDie [[x]] = fromSql x
+      extractIntegerOrDie _     = error "I expected to be able to extract an integer and that did not happen."
+
+extractInteger :: [[SqlValue]] -> Maybe Integer
+extractInteger [[x]] = Just $ fromSql x
+extractInteger _     = Nothing
+
+findOrCreateTags :: (IConnection c) => c -> Integer -> [String] -> IO [Integer]
+findOrCreateTags conn itemId = mapM findOrCreateTag
+   where
+      findOrCreateTag :: String -> IO Integer
+      findOrCreateTag tag = do
+         res <- fmap extractInteger $ quickQuery' conn "select id from tags where tag_name = ?" [toSql tag]
+         case res of
+            Just x -> return x
+            Nothing -> do
+               run conn "INSERT INTO tags (tag_name, created_at) VALUES (?, datetime())" [toSql tag]
+               getLastId conn

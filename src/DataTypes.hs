@@ -7,6 +7,12 @@ data Item = Item
    , itemDescription :: String
    , itemCreatedAt :: LocalTime
    , itemPriority :: Integer
-   , itemChildren :: [Item]
    }
    deriving(Show, Eq)
+
+data EventTypes = EventAdd | EventEdit | EventDone | EventRemove
+                deriving(Enum, Eq, Show)
+
+data ItemState = StateNotDone | StateDone
+               deriving(Enum, Eq, Show)
+
