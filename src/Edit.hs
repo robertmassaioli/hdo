@@ -24,7 +24,7 @@ executeEditCommand config editCommand = do
    case mconn of
       Nothing -> gracefulExit
       Just conn -> do
-         sequence_ . intersperse (putStrLn "") . map (editSingleId conn) . getEditRanges . editRanges $ editCommand
+         sequence_ . intersperse putNewline . map (editSingleId conn) . getEditRanges . editRanges $ editCommand
          commit conn
          disconnect conn
       where

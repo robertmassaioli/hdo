@@ -21,12 +21,12 @@ executeShowCommand config showFlags = do
       Nothing -> gracefulExit
       Just conn -> do
          unless (filter_str == "") $ print (getFilters filter_str)
-         maxId <- fmap getSingleValue $ quickQuery' conn "select max(id) from items;" []
          case showUsingTags showFlags of
-            Nothing -> getTodoItems conn (generateQuery []) >>= displayItems maxId
+            --Nothing -> getTodoItems conn (generateQuery []) >>= displayItems maxId
+            Nothing -> getTodoLists conn >>= sequence_ . intersperse putNewline . fmap (displayList 0)
             Just x -> case separateCommas x of
                         Nothing -> putStrLn "Invalid text was placed in the tags."
-                        Just x -> getTodoItems conn (generateQuery x) >>= displayItems maxId
+                        Just x -> print "Not implemented yet"
          disconnect conn
    where
       filter_str = intercalate "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
@@ -35,25 +35,63 @@ executeShowCommand config showFlags = do
       generateQuery [] = "SELECT i.* FROM items i where i.current_state < ? "
       generateQuery xs = queryLeft ++ " AND (" ++ createOrList "t.tag_name =" xs ++ ")"
 
-      getSingleValue :: [[SqlValue]] -> Int
-      getSingleValue [[x]] = length . show $ getInt 
-         where getInt :: Int
-               getInt = fromSql x
-      getSingleValue _ = 1
-
       queryLeft = "SELECT i.* FROM items i, tags t, tag_map tm where i.id = tm.item_id AND tm.tag_id = t.id AND i.current_state < ?"
 
-displayItems :: Int -> [Item] -> IO ()
-displayItems maxLen = mapM_ (displayItemHelper 0)
+data List = List
+   { listName :: String
+   , listMaxIdLen :: Int
+   , listItems :: [Item]
+   , childLists :: [List]
+   } deriving(Show)
+
+getTodoLists :: (IConnection c) => c -> IO [List]
+getTodoLists conn = do
+   topLevels <- quickQuery' conn "SELECT l.* FROM lists l where l.parent_id is null order by l.name, l.created_at" []
+   mapM createChildList topLevels
    where
-      displayItemHelper :: Int -> Item -> IO ()
-      displayItemHelper level item = do
-         putStr $ replicate (level * 3 + 1) ' '
-         putStr $ show (itemId item) ++ "." ++ spacesLen
+      createChildList :: [SqlValue] -> IO List
+      createChildList [lid, lname, lhidden, lcreatedAt, lparentId] = do
+         children <- mapM createChildList =<< quickQuery' conn "SELECT l.* FROM lists l WHERE l.parent_id = ? order by l.name, l.created_at" [lid]
+         maxItemId <- fmap (maybe 1 id . extractInteger) $ quickQuery' conn "SELECT max(i.id) FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id" [lid]
+         items <- mapM toItem =<< quickQuery' conn "SELECT i.* FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id ORDER BY i.priority, i.id" [lid]
+         return $ List 
+            { listName = fromSql lname
+            , listMaxIdLen = fromInteger maxItemId
+            , listItems = items
+            , childLists = children
+            }
+         where
+            toItem :: [SqlValue] -> IO Item
+            toItem [iId, iListId, iDescription, iCurrentState, iCreatedAt, iPriority, iDueDate] = 
+               return $ Item 
+                  { itemId = fromSql iId
+                  , itemDescription = fromSql iDescription
+                  , itemCreatedAt = fromSql iCreatedAt
+                  , itemDueDate = fromSql iDueDate
+                  , itemPriority = fromSql iPriority
+                  }
+
+displayList :: Int -> List -> IO ()
+displayList indentLevel list = do
+   putStr indentSpace
+   putStrLn $ listName list ++ ":"
+   mapM_ displayItem $ listItems list
+   unless (null . childLists $ list) $ do
+      putNewline
+      sequence_ . intersperse putNewline $ fmap (displayList $ indentLevel + 1) (childLists list)
+   where
+      indentSpace = replicate (spacesPerIndent * indentLevel) ' '
+      spacesPerIndent = 3
+
+      displayItem :: Item -> IO ()
+      displayItem item = do
+         putStr $ indentSpace ++ replicate spacesPerIndent ' ' ++ itemIdString ++ "." ++ extraSpaces
          putStrLn $ itemDescription item
-            where
-               itemString = show (itemId item)
-               spacesLen = replicate (1 + maxLen - length itemString) ' '
+         where
+            extraSpaces :: String
+            extraSpaces = replicate (1 + (length . show . listMaxIdLen $ list) - length itemIdString) ' '
+
+            itemIdString = show $ itemId item
 
 createListType :: (Show a) => String -> String -> [a] -> String
 createListType comb prefix values = 
@@ -69,25 +107,3 @@ createOrList = createListType "OR"
 
 createAndList :: (Show a) => String -> [a] -> String
 createAndList = createListType "AND"
-   
-getTodoItems :: (IConnection c) => c -> String -> IO [Item]
-getTodoItems conn baseQuery = do
-   topLevels <- quickQuery' conn topLevelQuery [toSql $ fromEnum StateDone, SqlNull]
-   fmap sortItems $ mapM createChild topLevels
-   where
-      topLevelQuery = baseQuery ++ " AND i.parent_id is ?"
-      childQuery = baseQuery ++ " AND i.parent_id = ?"
-
-      createChild :: [SqlValue] -> IO Item
-      createChild [iId, iDescription, iStatus, iCreatedAt, _, iParent] = do
-         let this_id = fromSql iId :: Integer
-         children <- mapM createChild =<< quickQuery' conn childQuery [toSql $ fromEnum StateDone, toSql this_id]
-         return Item
-                  { itemId = fromSql iId
-                  , itemDescription = fromSql iDescription
-                  , itemCreatedAt = fromSql iCreatedAt
-                  , itemPriority = fromSql iParent
-                  }
-
-      sortItems :: [Item] -> [Item]
-      sortItems = sortBy $ \x y -> comparing itemPriority x y

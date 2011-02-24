@@ -10,6 +10,9 @@ import Text.Show.Pretty
 prettyShow :: (Show a) => a -> IO ()
 prettyShow = putStrLn . ppShow
 
+putNewline :: IO ()
+putNewline = putStrLn ""
+
 separateBy :: Char -> String -> Maybe [String]
 separateBy sep input = 
    case parse parseCommas "(unknown)" input of
@@ -36,6 +39,7 @@ getLastId conn = fmap extractIntegerOrDie $ quickQuery' conn "select last_insert
       extractIntegerOrDie _     = error "I expected to be able to extract an integer and that did not happen."
 
 extractInteger :: [[SqlValue]] -> Maybe Integer
+extractInteger [[SqlNull]] = Nothing
 extractInteger [[x]] = Just $ fromSql x
 extractInteger _     = Nothing
 

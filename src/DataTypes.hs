@@ -6,6 +6,7 @@ data Item = Item
    { itemId :: Integer
    , itemDescription :: String
    , itemCreatedAt :: LocalTime
+   , itemDueDate :: Maybe LocalTime
    , itemPriority :: Integer
    }
    deriving(Show, Eq)
@@ -15,4 +16,3 @@ data EventTypes = EventAdd | EventEdit | EventDone | EventRemove
 
 data ItemState = StateNotDone | StateDone
                deriving(Enum, Eq, Show)
-

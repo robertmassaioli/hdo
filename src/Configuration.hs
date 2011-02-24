@@ -12,6 +12,7 @@ import System.FilePath
 import Database.HDBC.Sqlite3
 
 import TodoArguments
+import Util
 
 data Config = Config 
    { defaultDatabaseName :: String
@@ -36,6 +37,7 @@ getDatabaseConnection config command = do
       Nothing -> putStrLn "Could not find hTodo database in path. Maybe you should try 'htodo init' to start a new todo in the current directory?" >> return Nothing
       Just validPath -> do
          putStrLn $ "Using database: " ++ validPath
+         putNewline
          fmap Just $ connectSqlite3 validPath
    where
       findHomeDatabase :: IO (Maybe FilePath)
