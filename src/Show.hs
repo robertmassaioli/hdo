@@ -37,13 +37,6 @@ executeShowCommand config showFlags = do
 
       queryLeft = "SELECT i.* FROM items i, tags t, tag_map tm where i.id = tm.item_id AND tm.tag_id = t.id AND i.current_state < ?"
 
-data List = List
-   { listName :: String
-   , listMaxIdLen :: Int
-   , listItems :: [Item]
-   , childLists :: [List]
-   } deriving(Show)
-
 getTodoLists :: (IConnection c) => c -> IO [List]
 getTodoLists conn = do
    topLevels <- quickQuery' conn "SELECT l.* FROM lists l where l.parent_id is null order by l.name, l.created_at" []
@@ -75,17 +68,20 @@ displayList :: Int -> List -> IO ()
 displayList indentLevel list = do
    putStr indentSpace
    putStrLn $ listName list ++ ":"
-   mapM_ displayItem $ listItems list
+   case listItems list of
+      [] -> putStrLn $ itemIndentSpace ++ "-Empty-"
+      xs -> mapM_ displayItem xs
    unless (null . childLists $ list) $ do
       putNewline
       sequence_ . intersperse putNewline $ fmap (displayList $ indentLevel + 1) (childLists list)
    where
+      itemIndentSpace = replicate (spacesPerIndent * (indentLevel + 1)) ' '
       indentSpace = replicate (spacesPerIndent * indentLevel) ' '
       spacesPerIndent = 3
 
       displayItem :: Item -> IO ()
       displayItem item = do
-         putStr $ indentSpace ++ replicate spacesPerIndent ' ' ++ itemIdString ++ "." ++ extraSpaces
+         putStr $ itemIndentSpace ++ itemIdString ++ "." ++ extraSpaces
          putStrLn $ itemDescription item
          where
             extraSpaces :: String
@@ -93,17 +89,3 @@ displayList indentLevel list = do
 
             itemIdString = show $ itemId item
 
-createListType :: (Show a) => String -> String -> [a] -> String
-createListType comb prefix values = 
-   intercalate (" " ++ comb ++ " ") $ zipWith joinFunc (repeat prefix) (fmap show values)
-   where 
-      joinFunc a b = a ++ " " ++ b
-
-surround :: a -> [a] -> [a]
-surround a xs = [a] ++ xs ++ [a]
-
-createOrList :: (Show a) => String -> [a] -> String
-createOrList = createListType "OR"
-
-createAndList :: (Show a) => String -> [a] -> String
-createAndList = createListType "AND"

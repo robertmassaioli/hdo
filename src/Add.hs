@@ -26,7 +26,7 @@ executeAddCommand config addFlags = do
          case mconn of
             Nothing -> gracefulExit
             Just conn -> do
-               run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql (parent addFlags), toSql pri]
+               run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql pri]
                itemId <- getLastId conn
                run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
                unless (null tags) $ do
@@ -56,6 +56,6 @@ executeAddCommand config addFlags = do
       putStrFlush s = putStr s >> hFlush stdout 
 
       addInsertion :: String
-      addInsertion = "INSERT INTO items (description, current_state, created_at, parent_id, priority)" ++ 
-                     "VALUES (?, ?, datetime() ,?,?)"
+      addInsertion = "INSERT INTO items (description, current_state, created_at, priority)" ++ 
+                     "VALUES (?, ?, datetime(), ?)"
 

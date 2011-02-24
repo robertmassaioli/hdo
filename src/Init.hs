@@ -55,7 +55,7 @@ tableItems = "create table items ("
               ++ "current_state integer not null default 0,"
               ++ "created_at datetime not null,"
               ++ "priority integer not null,"
-              ++ "due_date datetime,"
+              ++ "due_date date,"
               ++ "FOREIGN KEY(list_id) references listts(id) on delete cascade"
               ++ ");"
 

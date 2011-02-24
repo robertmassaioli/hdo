@@ -26,7 +26,7 @@ data TodoCommand
                , fromFile :: Maybe FilePath 
                , priority :: Maybe Integer
                , databaseFile :: Maybe FilePath
-               , parent :: Maybe Integer
+               , listPath :: Maybe String
                }
             | Done 
                { userLevel :: Bool
@@ -134,13 +134,11 @@ addMode = Add
                                  &= name "from-file" 
                                  &= help "Add a bunch of todo items from a file."
                                  &= typ "<file_name>"
+            , listPath = Nothing &= args
+                                 &= typ "list/path"
             , priority = Nothing &= name "priority" 
                                  &= help "What priority level is this todo item." 
                                  &= typ "[1-9]"
-            , parent = def &= explicit
-                           &= name "parent" &= name "g"
-                           &= help "Choose the parent for this item."
-                           &= typ "<parent_id>"
             , databaseFile = def
                &= explicit
                &= name "d" &= name "database"

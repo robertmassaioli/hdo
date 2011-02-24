@@ -1,5 +1,6 @@
 module Util where
 
+import Data.List (intercalate)
 import Database.HDBC
 
 import Text.Parsec
@@ -54,3 +55,19 @@ findOrCreateTags conn itemId = mapM findOrCreateTag
             Nothing -> do
                run conn "INSERT INTO tags (tag_name, created_at) VALUES (?, datetime())" [toSql tag]
                getLastId conn
+
+-- TODO I think that I need to create a database specific Util file.
+createListType :: (Show a) => String -> String -> [a] -> String
+createListType comb prefix values = 
+   intercalate (" " ++ comb ++ " ") $ zipWith joinFunc (repeat prefix) (fmap show values)
+   where 
+      joinFunc a b = a ++ " " ++ b
+
+surround :: a -> [a] -> [a]
+surround a xs = [a] ++ xs ++ [a]
+
+createOrList :: (Show a) => String -> [a] -> String
+createOrList = createListType "OR"
+
+createAndList :: (Show a) => String -> [a] -> String
+createAndList = createListType "AND"
