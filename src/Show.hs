@@ -53,7 +53,7 @@ displayItems maxLen = mapM_ (displayItemHelper 0)
          putStrLn $ itemDescription item
             where
                itemString = show (itemId item)
-               spacesLen = take (1 + maxLen - (length itemString)) $ repeat ' '
+               spacesLen = replicate (1 + maxLen - length itemString) ' '
 
 createListType :: (Show a) => String -> String -> [a] -> String
 createListType comb prefix values = 
