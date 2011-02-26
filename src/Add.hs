@@ -18,7 +18,6 @@ import DataTypes
 -- TODO This function needs to be a MaybeT IO ()
 executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config addFlags = do
-   prettyShow addFlags
    mconn <- getDatabaseConnection config addFlags
    case mconn of
       Nothing -> gracefulExit

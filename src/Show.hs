@@ -46,7 +46,7 @@ getTodoLists conn = do
       createChildList [lid, lname, lhidden, lcreatedAt, lparentId] = do
          children <- mapM createChildList =<< quickQuery' conn "SELECT l.* FROM lists l WHERE l.parent_id = ? order by l.name, l.created_at" [lid]
          maxItemId <- fmap (maybe 1 id . extractInteger) $ quickQuery' conn "SELECT max(i.id) FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id" [lid]
-         items <- mapM toItem =<< quickQuery' conn "SELECT i.* FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id ORDER BY i.priority, i.id" [lid]
+         items <- mapM toItem =<< quickQuery' conn "SELECT i.* FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id AND i.current_state < ? ORDER BY i.priority, i.id" [lid, toSql . fromEnum $ StateDone]
          return $ List 
             { listName = fromSql lname
             , listMaxIdLen = fromInteger maxItemId
