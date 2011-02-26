@@ -68,11 +68,10 @@ displayList :: Int -> List -> IO ()
 displayList indentLevel list = do
    putStr indentSpace
    putStrLn $ listName list ++ ":"
-   case listItems list of
-      [] -> putStrLn $ itemIndentSpace ++ "-Empty-"
-      xs -> mapM_ displayItem xs
-   unless (null . childLists $ list) $ do
+   unless (null . listItems $ list) $ do
+      mapM_ displayItem (listItems list)
       putNewline
+   unless (null . childLists $ list) $ do
       sequence_ . intersperse putNewline $ fmap (displayList $ indentLevel + 1) (childLists list)
    where
       itemIndentSpace = replicate (spacesPerIndent * (indentLevel + 1)) ' '

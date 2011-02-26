@@ -18,15 +18,18 @@ import DataTypes
 -- TODO This function needs to be a MaybeT IO ()
 executeAddCommand :: Config -> TodoCommand -> IO ()
 executeAddCommand config addFlags = do
-   d <- getData addFlags
-   case d of
-      Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
-      Just (comment, pri, tags) -> do
-         mconn <- getDatabaseConnection config addFlags
-         case mconn of
-            Nothing -> gracefulExit
-            Just conn -> do
-               run conn addInsertion [toSql comment, toSql $ fromEnum StateNotDone, toSql pri]
+   prettyShow addFlags
+   mconn <- getDatabaseConnection config addFlags
+   case mconn of
+      Nothing -> gracefulExit
+      Just conn -> do
+         d <- getData addFlags
+         case d of
+            Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
+            Just (comment, pri, tags) -> do
+               listId <- getOrCreateListId conn (listPath addFlags)
+               putStrLn $ "List id: " ++ show listId
+               run conn addInsertion [toSql listId, toSql comment, toSql $ fromEnum StateNotDone, toSql pri]
                itemId <- getLastId conn
                run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
                unless (null tags) $ do
@@ -56,6 +59,25 @@ executeAddCommand config addFlags = do
       putStrFlush s = putStr s >> hFlush stdout 
 
       addInsertion :: String
-      addInsertion = "INSERT INTO items (description, current_state, created_at, priority)" ++ 
-                     "VALUES (?, ?, datetime(), ?)"
+      addInsertion = "INSERT INTO items (list_id, description, current_state, created_at, priority)" ++ 
+                     "VALUES (?, ?, ?, datetime(), ?)"
 
+      -- TODO this function only handles the top level list id but there may be more to it, more
+      -- levels deep
+      getOrCreateListId :: (IConnection c) => c -> Maybe String -> IO Integer
+      getOrCreateListId _     Nothing     = return 1 
+      getOrCreateListId _     (Just [])   = return 1
+      getOrCreateListId conn  (Just xs)   = go Nothing (maybe [] id $ separateBy '/' xs)
+         where 
+            go :: Maybe Integer -> [String] -> IO Integer
+            go Nothing []        = return 1
+            go (Just listId) []  = return listId
+            go listId (name:xs)  = do
+               result <- fmap extractInteger $ quickQuery' conn "SELECT id FROM lists WHERE name = ? AND parent_id = ?" [toSql name, toSql listId]
+               case result of 
+                  Nothing -> do
+                     run conn "INSERT INTO lists(name, hidden, created_at, parent_id) VALUES (?, 0, datetime(), ?)" [toSql name, toSql listId]
+                     lastId <- getLastId conn
+                     go (Just lastId) xs
+                  existing -> do
+                     go existing xs
