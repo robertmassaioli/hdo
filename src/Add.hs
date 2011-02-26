@@ -73,7 +73,7 @@ executeAddCommand config addFlags = do
             go Nothing []        = return 1
             go (Just listId) []  = return listId
             go listId (name:xs)  = do
-               result <- fmap extractInteger $ quickQuery' conn "SELECT id FROM lists WHERE name = ? AND parent_id = ?" [toSql name, toSql listId]
+               result <- fmap extractInteger $ quickQuery' conn (selectQuery listId) [toSql name, toSql listId]
                case result of 
                   Nothing -> do
                      run conn "INSERT INTO lists(name, hidden, created_at, parent_id) VALUES (?, 0, datetime(), ?)" [toSql name, toSql listId]
@@ -81,3 +81,9 @@ executeAddCommand config addFlags = do
                      go (Just lastId) xs
                   existing -> do
                      go existing xs
+               where
+                  selectQuery :: Maybe Integer -> String
+                  selectQuery Nothing = baseSelectQuery ++ " is ?"
+                  selectQuery (Just _) = baseSelectQuery ++ " = ?"
+                  
+                  baseSelectQuery = "SELECT id FROM lists WHERE name = ? AND parent_id"
