@@ -28,13 +28,16 @@ executeAddCommand config addFlags = do
             Just (comment, pri, tags) -> do
                listId <- getOrCreateListId conn (listPath addFlags)
                putStrLn $ "List id: " ++ show listId
+
                run conn addInsertion [toSql listId, toSql comment, toSql $ fromEnum StateNotDone, toSql pri]
                itemId <- getLastId conn
+
                run conn "INSERT INTO item_events (item_id, item_event_type, occurred_at) VALUES (?, ?, datetime())" [toSql itemId, toSql $ fromEnum EventAdd]
                unless (null tags) $ do
                   tagIds <- findOrCreateTags conn itemId tags
                   insertStatement <- prepare conn "INSERT INTO tag_map (item_id, tag_id, created_at) VALUES (?,?, datetime())"
                   mapM_ (execute insertStatement) [[toSql itemId, tag] | tag <- map toSql tagIds]
+
                commit conn
                disconnect conn
                putStrLn $ "Added item " ++ show itemId ++ " successfully."
@@ -47,10 +50,12 @@ executeAddCommand config addFlags = do
             getDataHelper = do
                Just description <- lift $ getInputLine "comment> "
                guard (not $ null description)
+
                Just pri <- lift $ case priority addCommand of
                   Nothing -> getInputLine "priority> "
                   Just pri -> getInputLineWithInitial "priority> " (show pri, "")
                guard (not $ null pri)
+
                Just tags <- lift $ getInputLine "tags> "
                return (description, pri, words tags)
 
@@ -82,7 +87,7 @@ executeAddCommand config addFlags = do
                      go existing xs
                where
                   selectQuery :: Maybe Integer -> String
-                  selectQuery Nothing = baseSelectQuery ++ " is ?"
+                  selectQuery Nothing  = baseSelectQuery ++ " is ?"
                   selectQuery (Just _) = baseSelectQuery ++ " = ?"
                   
                   baseSelectQuery = "SELECT id FROM lists WHERE name = ? AND parent_id"

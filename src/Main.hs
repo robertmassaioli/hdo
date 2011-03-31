@@ -35,11 +35,11 @@ setupAppDir config = do
       putStrLn $ "Created app data directory: " ++ defaultAppDirectory config
 
 executeCommand :: Config -> TodoCommand -> IO ()
-executeCommand c x@(Show {}) = executeShowCommand c x
-executeCommand c x@(Init {}) = executeInitCommand c x
-executeCommand c x@(Add {}) = executeAddCommand c x
-executeCommand c x@(Edit {}) = executeEditCommand c x
-executeCommand c x@(Done {}) = executeDoneCommand c x
+executeCommand c x@(Show {})  = executeShowCommand c x
+executeCommand c x@(Init {})  = executeInitCommand c x
+executeCommand c x@(Add {})   = executeAddCommand c x
+executeCommand c x@(Edit {})  = executeEditCommand c x
+executeCommand c x@(Done {})  = executeDoneCommand c x
 
 executeInitCommand :: Config -> TodoCommand -> IO ()
 executeInitCommand config initFlags = createDatabase initFlags config
