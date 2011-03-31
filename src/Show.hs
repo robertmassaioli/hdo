@@ -70,7 +70,7 @@ displayList indentLevel list = do
    putStrLn $ listName list ++ ":"
    unless (null . listItems $ list) $ do
       mapM_ displayItem (listItems list)
-      putNewline
+      unless (null (childLists list)) putNewline
    unless (null . childLists $ list) $ do
       sequence_ . intersperse putNewline $ fmap (displayList $ indentLevel + 1) (childLists list)
    where

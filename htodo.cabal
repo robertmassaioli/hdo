@@ -55,7 +55,7 @@ Executable htodo
       , HDBC == 2.2.6.1
       , HDBC-sqlite3 == 2.3.1.0
       , mtl == 1.1.0.2
-      , haskeline == 0.6.3.3
+      , haskeline == 0.6.4.0
       , MaybeT == 0.1.2
       -- remove once done
       , filepath == 1.2.0.0
