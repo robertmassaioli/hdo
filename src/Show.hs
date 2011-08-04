@@ -70,13 +70,15 @@ displayList indentLevel list = do
    putStrLn $ listName list ++ ":"
    unless (null . listItems $ list) $ do
       mapM_ displayItem (listItems list)
-      unless (null (childLists list)) putNewline
-   unless (null . childLists $ list) $ do
-      sequence_ . intersperse putNewline $ fmap (displayList $ indentLevel + 1) (childLists list)
+      unless (null theChildren) putNewline
+   unless (null theChildren) $ do
+      sequence_ . intersperse putNewline . fmap (displayList $ indentLevel + 1) $ theChildren
    where
       itemIndentSpace = replicate (spacesPerIndent * (indentLevel + 1)) ' '
       indentSpace = replicate (spacesPerIndent * indentLevel) ' '
       spacesPerIndent = 3
+
+      theChildren = childLists list
 
       displayItem :: Item -> IO ()
       displayItem item = do
