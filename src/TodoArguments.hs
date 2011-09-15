@@ -38,6 +38,18 @@ data TodoCommand
                , editRanges :: String 
                , databaseFile :: Maybe FilePath
                }
+            | Rename       -- This renames one list to another
+               { userLevel :: Bool
+               , fromListPath :: [String]
+               , toListPath :: String
+               , databaseFile :: Maybe FilePath
+               }
+            | Move         -- This moves an item from one list into another
+               { userLevel :: Bool
+               , itemRanges :: [String]
+               , toListPath :: String
+               , databaseFile :: Maybe FilePath
+               }
             deriving(Eq, Show, Data, Typeable)
 
 getCommandInput :: IO TodoCommand
@@ -58,6 +70,8 @@ combinedModes = modes
    , addMode
    , doneMode
    , editMode
+   , renameMode
+   , moveMode
    ]
 
 showMode :: TodoCommand
@@ -197,3 +211,51 @@ editMode = Edit
             ++ "can edit the description, add/remove tags, parent/reparent todo items and otherwise do any kind "
             ++ "of editing of the todo items that you would like."
             ]
+
+renameMode :: TodoCommand
+renameMode = Rename
+   { userLevel = False  
+      &= explicit
+      &= name "for-user" &= name "u"
+      &= help ("Specifies whether or not this is for the user or the current directory." 
+                ++ " Current directory is used by default.")
+   , fromListPath = [] 
+      &= args
+      &= typ "FROM_LIST"
+   , toListPath = "" 
+      &= argPos 0
+      &= typ "TO_LIST"
+   , databaseFile = def 
+      &= explicit
+      &= name "d" &= name "database"
+      &= typ "./path/to/database.db"
+      &= help "This is the path to the database file."
+   }
+   &= help "Rename one or more lists to the same list name."
+   &= details
+   [ "Occasionally you will want to rename lists into something else and move them arround. This "
+   ++ "command will let you do that. This command uses a many-to-one relationship when renaming "
+   ++ "lists."
+   ]
+
+moveMode :: TodoCommand
+moveMode = Move
+   { userLevel = False  
+      &= explicit
+      &= name "for-user" &= name "u"
+      &= help ("Specifies whether or not this is for the user or the current directory." 
+                ++ " Current directory is used by default.")
+   , itemRanges = [] &= args
+   , toListPath = "" &= argPos 0
+   , databaseFile = def 
+      &= explicit
+      &= name "d" &= name "database"
+      &= typ "./path/to/database.db"
+      &= help "This is the path to the database file."
+   }
+   &= help "Move one or more items to another list."
+   &= details
+   [ "Moving items between lists is an important task: this command lets you do exactly that by moving "
+   ++ "as many items as you want to another list. You can pull in the items from multiple other lists and "
+   ++ "move them all into the one list."
+   ]

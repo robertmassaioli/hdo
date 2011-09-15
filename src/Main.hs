@@ -15,9 +15,6 @@ main = do
    preConfig <- defaultConfig
    command <- getCommandInput
    let config = getUpdatedConfig command preConfig
-   --runReaderT setupAppDir config
-   {-prettyShow config-}
-   {-prettyShow command-}
    setupAppDir config
    executeCommand config command
 
@@ -40,6 +37,7 @@ executeCommand c x@(Init {})  = executeInitCommand c x
 executeCommand c x@(Add {})   = executeAddCommand c x
 executeCommand c x@(Edit {})  = executeEditCommand c x
 executeCommand c x@(Done {})  = executeDoneCommand c x
+executeCommand c x@(Rename {}) = print x
 
 executeInitCommand :: Config -> TodoCommand -> IO ()
 executeInitCommand config initFlags = createDatabase initFlags config
