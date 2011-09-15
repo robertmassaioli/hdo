@@ -48,17 +48,18 @@ Executable htodo
   -- Linux amongst others.
   Build-depends:       
       base 
-      , directory == 1.1.0.0
-      , time >= 1.2
+      , directory >= 1.1.0.0 && <= 1.1.0.1
+      , time >= 1.2 && <= 1.4
       , cmdargs == 0.6.5
-      , parsec == 3.1.0
-      , HDBC == 2.2.6.1
-      , HDBC-sqlite3 == 2.3.1.0
-      , mtl == 1.1.0.2
-      , haskeline == 0.6.4.0
+      , parsec >= 3.1.0 && <= 3.3.1
+      , HDBC >= 2.2.6.1 && <= 2.3.1.0
+      , HDBC-sqlite3 >= 2.3.1.0 && <= 2.3.3.0
+      , mtl >= 1.1.0.2 && <= 2.0.1.0
+      , haskeline >= 0.6.4.0 && <= 0.6.4.3
       , MaybeT == 0.1.2
+      , transformers == 0.2.2.0
       -- remove once done
-      , filepath == 1.2.0.0
+      , filepath >= 1.2.0.0 && <= 1.2.0.1
       , pretty-show == 1.1.1
   
   -- Modules not exported by this package.
