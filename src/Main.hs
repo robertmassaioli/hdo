@@ -1,6 +1,7 @@
 import Control.Monad (unless)
 
 import System.Directory
+import System.Exit 
 
 import TodoArguments
 import Configuration
@@ -32,12 +33,16 @@ setupAppDir config = do
       putStrLn $ "Created app data directory: " ++ defaultAppDirectory config
 
 executeCommand :: Config -> TodoCommand -> IO ()
-executeCommand c x@(Show {})  = executeShowCommand c x
-executeCommand c x@(Init {})  = executeInitCommand c x
-executeCommand c x@(Add {})   = executeAddCommand c x
-executeCommand c x@(Edit {})  = executeEditCommand c x
-executeCommand c x@(Done {})  = executeDoneCommand c x
-executeCommand c x@(Rename {}) = print x
+executeCommand c x@(Show {})     = executeShowCommand c x
+executeCommand c x@(Init {})     = executeInitCommand c x
+executeCommand c x@(Add {})      = executeAddCommand c x
+executeCommand c x@(Edit {})     = executeEditCommand c x
+executeCommand c x@(Done {})     = executeDoneCommand c x
+--executeCommand c x@(Rename {})   = executeRenameCommand c x
+--executeCommand c x@(Move {})     = executeMoveCommand c x
+executeCommand c x = do
+   putStrLn "Was unable to parse the option that I was given."
+   exitWith $ ExitFailure 2
 
 executeInitCommand :: Config -> TodoCommand -> IO ()
 executeInitCommand config initFlags = createDatabase initFlags config
