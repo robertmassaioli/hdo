@@ -6,7 +6,7 @@ import Database.HDBC
 import Database.HDBC.Sqlite3
 import Control.Monad (unless)
 import Control.Monad.Reader
-import Control.Monad.Maybe
+import Control.Monad.Trans.Maybe
 import System.Console.Haskeline
 import System.IO (hFlush, stdout)
 

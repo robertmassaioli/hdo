@@ -1,3 +1,5 @@
+{-# LANGUAGE DatatypeContexts #-}
+
 module Range (
       Range(..),
       rangesOverlap,
@@ -10,7 +12,7 @@ module Range (
 import Data.Ord (comparing)
 import Data.List (sortBy)
 
-data (Ord a) => Range a
+data Ord a => Range a
    = SingletonRange a
    | SpanRange a a
    deriving(Eq, Show)
