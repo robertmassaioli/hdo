@@ -245,8 +245,12 @@ moveMode = Move
       &= name "for-user" &= name "u"
       &= help ("Specifies whether or not this is for the user or the current directory." 
                 ++ " Current directory is used by default.")
-   , itemRanges = [] &= args
-   , toListPath = "" &= argPos 0
+   , itemRanges = [] 
+      &= args
+      &= typ "ITEM_RANGES"
+   , toListPath = "" 
+      &= argPos 0
+      &= typ "LIST"
    , databaseFile = def 
       &= explicit
       &= name "d" &= name "database"
