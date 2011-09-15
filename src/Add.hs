@@ -9,6 +9,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import System.Console.Haskeline
 import System.IO (hFlush, stdout)
+import Data.Maybe (fromMaybe)
 
 import TodoArguments
 import Util
@@ -71,7 +72,7 @@ executeAddCommand config addFlags = do
       getOrCreateListId :: (IConnection c) => c -> Maybe String -> IO Integer
       getOrCreateListId _     Nothing     = return 1 
       getOrCreateListId _     (Just [])   = return 1
-      getOrCreateListId conn  (Just xs)   = go Nothing (maybe [] id $ separateBy '/' xs)
+      getOrCreateListId conn  (Just xs)   = go Nothing (fromMaybe [] $ separateBy '/' xs)
          where 
             go :: Maybe Integer -> [String] -> IO Integer
             go Nothing []        = return 1
@@ -83,8 +84,7 @@ executeAddCommand config addFlags = do
                      run conn "INSERT INTO lists(name, hidden, created_at, parent_id) VALUES (?, 0, datetime(), ?)" [toSql name, toSql listId]
                      lastId <- getLastId conn
                      go (Just lastId) xs
-                  existing -> do
-                     go existing xs
+                  existing -> go existing xs
                where
                   selectQuery :: Maybe Integer -> String
                   selectQuery Nothing  = baseSelectQuery ++ " is ?"

@@ -5,7 +5,7 @@ module Show
 import Control.Monad
 import Data.List
 import Database.HDBC
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Ord(comparing)
 
 import Util
@@ -45,9 +45,9 @@ getTodoLists conn = do
       createChildList :: [SqlValue] -> IO List
       createChildList [lid, lname, lhidden, lcreatedAt, lparentId] = do
          children <- mapM createChildList =<< quickQuery' conn "SELECT l.* FROM lists l WHERE l.parent_id = ? order by l.name, l.created_at" [lid]
-         maxItemId <- fmap (maybe 1 id . extractInteger) $ quickQuery' conn "SELECT max(i.id) FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id" [lid]
+         maxItemId <- fmap (fromMaybe 1 . extractInteger) $ quickQuery' conn "SELECT max(i.id) FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id" [lid]
          items <- mapM toItem =<< quickQuery' conn "SELECT i.* FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id AND i.current_state < ? ORDER BY i.priority, i.id" [lid, toSql . fromEnum $ StateDone]
-         return $ List 
+         return List 
             { listName = fromSql lname
             , listMaxIdLen = fromInteger maxItemId
             , listItems = items
@@ -56,7 +56,7 @@ getTodoLists conn = do
          where
             toItem :: [SqlValue] -> IO Item
             toItem [iId, iListId, iDescription, iCurrentState, iCreatedAt, iPriority, iDueDate] = 
-               return $ Item 
+               return Item 
                   { itemId = fromSql iId
                   , itemDescription = fromSql iDescription
                   , itemCreatedAt = fromSql iCreatedAt
@@ -71,7 +71,7 @@ displayList indentLevel list = do
    unless (null . listItems $ list) $ do
       mapM_ displayItem (listItems list)
       unless (null theChildren) putNewline
-   unless (null theChildren) $ do
+   unless (null theChildren) $
       sequence_ . intersperse putNewline . fmap (displayList $ indentLevel + 1) $ theChildren
    where
       itemIndentSpace = replicate (spacesPerIndent * (indentLevel + 1)) ' '
