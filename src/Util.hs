@@ -2,6 +2,8 @@ module Util where
 
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Class
 import Database.HDBC
 
 import Text.Parsec
@@ -98,18 +100,16 @@ getOrCreateListId conn  (Just xs)   = go Nothing (fromMaybe [] $ separateBy '/' 
             
             baseSelectQuery = "SELECT id FROM lists WHERE name = ? AND parent_id"
 
-getListId :: IConnection c => c -> String -> IO (Maybe Integer)
-getListId _    [] = return . Just $ 1
+getListId :: IConnection c => c -> String -> MaybeT IO Integer
+getListId _    [] = return 1
 getListId conn xs = go Nothing (fromMaybe [] $ separateBy '/' xs)
    where
-      go :: Maybe Integer -> [String] -> IO (Maybe Integer)
-      go Nothing [] = return . Just $ 1
-      go ret@(Just _) [] = return ret
+      go :: Maybe Integer -> [String] -> MaybeT IO Integer
+      go Nothing [] = return 1
+      go (Just listId) [] = return listId
       go listId (name:names) = do
-         result <- fmap extractInteger $ quickQuery' conn (selectQuery listId) [toSql name, toSql listId]
-         case result of
-            Nothing -> return Nothing
-            existing -> go existing names
+         result <- lift $ fmap extractInteger $ quickQuery' conn (selectQuery listId) [toSql name, toSql listId]
+         go result names
          where 
             selectQuery :: Maybe Integer -> String
             selectQuery Nothing = baseSelectQuery ++ " is ?"

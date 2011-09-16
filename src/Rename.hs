@@ -2,11 +2,13 @@ module Rename
    ( executeRenameCommand
    ) where
 
+import Database.HDBC
 import TodoArguments
 import Configuration
 import Util
 
 import Data.Maybe (catMaybes)
+import Control.Monad.Trans.Maybe
 
 {- 
  - The entire purpose of the rename command is to move one or more lists into another list.
@@ -22,7 +24,18 @@ executeRenameCommand config command@(Rename {}) = do
       Nothing -> gracefulExit
       Just conn -> do
          toId <- getOrCreateListId conn (Just $ toListPath command)
-         fromIds <- fmap catMaybes $ mapM (getListId conn) (fromListPath command)
+         fromIds <- fmap catMaybes $ mapM (runMaybeT . getListId conn) (fromListPath command)
+         run conn (updateItems fromIds) [toSql toId]
+         run conn (deleteOldLists fromIds) []
+         commit conn
+         disconnect conn
+         putStr $ "Successfully renamed: "
          putStr . show $ fromIds
          putStr " => "
-         putStrLn . show $ toId
+         print toId
+   where
+      updateItems :: [Integer] -> String
+      updateItems fromItems = "UPDATE items SET list_id = ? WHERE " ++ createOrList "list_id =" fromItems
+
+      deleteOldLists :: [Integer] -> String
+      deleteOldLists fromItems = "DELETE FROM lists where " ++ createOrList "id =" fromItems
