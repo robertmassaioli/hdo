@@ -101,11 +101,11 @@ getOrCreateListId conn  (Just xs)   = go Nothing (fromMaybe [] $ separateBy '/' 
             baseSelectQuery = "SELECT id FROM lists WHERE name = ? AND parent_id"
 
 getListId :: IConnection c => c -> String -> MaybeT IO Integer
-getListId _    [] = return 1
+getListId _    [] = fail "No id could possibly be found."
 getListId conn xs = go Nothing (fromMaybe [] $ separateBy '/' xs)
    where
       go :: Maybe Integer -> [String] -> MaybeT IO Integer
-      go Nothing [] = return 1
+      go Nothing [] = fail "No id could possibly be found."
       go (Just listId) [] = return listId
       go listId (name:names) = do
          result <- lift $ fmap extractInteger $ quickQuery' conn (selectQuery listId) [toSql name, toSql listId]

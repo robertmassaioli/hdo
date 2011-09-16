@@ -9,7 +9,7 @@ import Util
 
 import Data.Maybe (catMaybes)
 import Control.Monad.Trans.Maybe (runMaybeT)
-import Control.Monad (guard)
+import Control.Monad (unless)
 
 {- 
  - The entire purpose of the rename command is to move one or more lists into another list.
@@ -28,17 +28,35 @@ executeRenameCommand config command@(Rename {}) =
             Just conn -> do
                toId <- getOrCreateListId conn (Just $ toListPath command)
                fromIds <- fmap catMaybes $ mapM (runMaybeT . getListId conn) (fromListPath command)
-               run conn (updateItems fromIds) [toSql toId]
-               run conn (deleteOldLists fromIds) []
+               if null fromIds
+                  then putStrLn "Could not find any lists to move to the new one."
+                  else do
+                     run conn (updateItems fromIds) [toSql toId]
+                     cleanOldLists conn fromIds
+                     putStr "Successfully renamed: "
+                     putStr . show $ fromIds
+                     putStr " => "
+                     print toId
                commit conn
                disconnect conn
-               putStr $ "Successfully renamed: "
-               putStr . show $ fromIds
-               putStr " => "
-               print toId
    where
       updateItems :: [Integer] -> String
       updateItems fromItems = "UPDATE items SET list_id = ? WHERE " ++ createOrList "list_id =" fromItems
 
-      deleteOldLists :: [Integer] -> String
-      deleteOldLists fromItems = "DELETE FROM lists where " ++ createOrList "id =" fromItems
+      cleanOldLists :: IConnection c => c -> [Integer] -> IO ()
+      cleanOldLists _ [] = return ()
+      cleanOldLists conn (oldList:xs) = do
+         mcount <- fmap extractInteger $ quickQuery' conn "SELECT count(*) FROM items WHERE list_id = ?" [toSql oldList]
+         case mcount of
+            Nothing -> do
+               putStrLn "Major error, somehow the SQL count did not return a number..."
+               cleanOldLists conn xs
+            Just count -> 
+               if count == 0
+                  then do
+                     parent <- quickQuery' conn "SELECT parent_id FROM lists WHERE id = ?" [toSql oldList]
+                     run conn "DELETE FROM lists where id = ?" [toSql oldList]
+                     case parent of
+                        [] -> cleanOldLists conn xs
+                        [x] -> cleanOldLists conn $ maybe xs (\x -> xs ++ [x]) (extractInteger [x])
+                  else cleanOldLists conn xs
