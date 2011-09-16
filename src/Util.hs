@@ -1,6 +1,7 @@
 module Util where
 
 import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
 import Database.HDBC
 
 import Text.Parsec
@@ -71,3 +72,47 @@ createOrList = createListType "OR"
 
 createAndList :: (Show a) => String -> [a] -> String
 createAndList = createListType "AND"
+
+-- TODO this function only handles the top level list id but there may be more to it, more
+-- levels deep
+getOrCreateListId :: (IConnection c) => c -> Maybe String -> IO Integer
+getOrCreateListId _     Nothing     = return 1 
+getOrCreateListId _     (Just [])   = return 1
+getOrCreateListId conn  (Just xs)   = go Nothing (fromMaybe [] $ separateBy '/' xs)
+   where 
+      go :: Maybe Integer -> [String] -> IO Integer
+      go Nothing []        = return 1
+      go (Just listId) []  = return listId
+      go listId (name:xs)  = do
+         result <- fmap extractInteger $ quickQuery' conn (selectQuery listId) [toSql name, toSql listId]
+         case result of 
+            Nothing -> do
+               run conn "INSERT INTO lists(name, hidden, created_at, parent_id) VALUES (?, 0, datetime(), ?)" [toSql name, toSql listId]
+               lastId <- getLastId conn
+               go (Just lastId) xs
+            existing -> go existing xs
+         where
+            selectQuery :: Maybe Integer -> String
+            selectQuery Nothing  = baseSelectQuery ++ " is ?"
+            selectQuery (Just _) = baseSelectQuery ++ " = ?"
+            
+            baseSelectQuery = "SELECT id FROM lists WHERE name = ? AND parent_id"
+
+getListId :: IConnection c => c -> String -> IO (Maybe Integer)
+getListId _    [] = return . Just $ 1
+getListId conn xs = go Nothing (fromMaybe [] $ separateBy '/' xs)
+   where
+      go :: Maybe Integer -> [String] -> IO (Maybe Integer)
+      go Nothing [] = return . Just $ 1
+      go ret@(Just _) [] = return ret
+      go listId (name:names) = do
+         result <- fmap extractInteger $ quickQuery' conn (selectQuery listId) [toSql name, toSql listId]
+         case result of
+            Nothing -> return Nothing
+            existing -> go existing names
+         where 
+            selectQuery :: Maybe Integer -> String
+            selectQuery Nothing = baseSelectQuery ++ " is ?"
+            selectQuery (Just _) = baseSelectQuery ++ " = ?"
+
+            baseSelectQuery = "SELECT id FROM lists WHERE name = ? and parent_id"

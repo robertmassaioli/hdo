@@ -42,11 +42,6 @@ executeCommand c x@(Edit {})     = executeEditCommand c x
 executeCommand c x@(Done {})     = executeDoneCommand c x
 executeCommand c x@(Rename {})   = executeRenameCommand c x
 executeCommand c x@(Move {})     = executeMoveCommand c x
-{-
- - executeCommand _ _ = do
-   putStrLn "Was unable to parse the option that I was given."
-   exitWith $ ExitFailure 2
--}
 
 executeInitCommand :: Config -> TodoCommand -> IO ()
 executeInitCommand config initFlags = createDatabase initFlags config
