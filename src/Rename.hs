@@ -8,7 +8,8 @@ import Configuration
 import Util
 
 import Data.Maybe (catMaybes)
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Maybe (runMaybeT)
+import Control.Monad (guard)
 
 {- 
  - The entire purpose of the rename command is to move one or more lists into another list.
@@ -17,22 +18,24 @@ import Control.Monad.Trans.Maybe
  - other list that you are supposed to be moving to.
  -}
 executeRenameCommand :: Config -> TodoCommand -> IO ()
-executeRenameCommand config command@(Rename {}) = do
-   print command
-   mconn <- getDatabaseConnection config command
-   case mconn of
-      Nothing -> gracefulExit
-      Just conn -> do
-         toId <- getOrCreateListId conn (Just $ toListPath command)
-         fromIds <- fmap catMaybes $ mapM (runMaybeT . getListId conn) (fromListPath command)
-         run conn (updateItems fromIds) [toSql toId]
-         run conn (deleteOldLists fromIds) []
-         commit conn
-         disconnect conn
-         putStr $ "Successfully renamed: "
-         putStr . show $ fromIds
-         putStr " => "
-         print toId
+executeRenameCommand config command@(Rename {}) =
+   if null . fromListPath $ command
+      then putStrLn "No FROM_LISTS given but atleast one is required: doing nothing."
+      else do
+         mconn <- getDatabaseConnection config command
+         case mconn of
+            Nothing -> gracefulExit
+            Just conn -> do
+               toId <- getOrCreateListId conn (Just $ toListPath command)
+               fromIds <- fmap catMaybes $ mapM (runMaybeT . getListId conn) (fromListPath command)
+               run conn (updateItems fromIds) [toSql toId]
+               run conn (deleteOldLists fromIds) []
+               commit conn
+               disconnect conn
+               putStr $ "Successfully renamed: "
+               putStr . show $ fromIds
+               putStr " => "
+               print toId
    where
       updateItems :: [Integer] -> String
       updateItems fromItems = "UPDATE items SET list_id = ? WHERE " ++ createOrList "list_id =" fromItems
