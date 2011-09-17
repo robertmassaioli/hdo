@@ -32,7 +32,7 @@ executeMoveCommand config command@(Move {}) = do
                run conn (itemUpdateString ranges) [toSql toId]
                commit conn
                disconnect conn
-               putStrLn $ "Moved items to list: " ++ toListPath command
+               putStrLn $ "Moved " ++ (concat . intersperse "," . itemRanges $ command) ++ " => " ++ toListPath command
    where
       itemUpdateString :: [Range Integer] -> String
       itemUpdateString ranges = "UPDATE items SET list_id = ? WHERE " ++ rangeToSqlOr "" (mergeRanges ranges)
