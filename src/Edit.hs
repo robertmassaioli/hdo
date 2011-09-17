@@ -63,7 +63,7 @@ executeEditCommand config editCommand = do
                getTagMapIds conn itemId tags = fmap (map fromSql . concat) $ quickQuery' conn theQuery [toSql itemId]
                   where
                      theQuery = "SELECT tm.tag_id from tag_map tm, tags t where t.id = tm.tag_id and (" ++ tagOrList ++ ") and tm.item_id = ?"
-                     tagOrList = intercalate " OR " $ map (\s -> "t.tag_name = \"" ++ s ++ "\"") tags
+                     tagOrList = createOrList "t.tag_name =" tags
 
                deleteTagMapping :: Statement -> Integer -> Integer -> IO ()
                deleteTagMapping statement itemId tagId = execute statement [toSql itemId, toSql tagId] >> return ()

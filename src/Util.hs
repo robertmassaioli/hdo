@@ -11,6 +11,8 @@ import Text.Parsec.String
 import Text.Parsec.Token
 import Text.Show.Pretty
 
+import Range
+
 prettyShow :: (Show a) => a -> IO ()
 prettyShow = putStrLn . ppShow
 
@@ -116,3 +118,21 @@ getListId conn xs = go Nothing (fromMaybe [] $ separateBy '/' xs)
             selectQuery (Just _) = baseSelectQuery ++ " = ?"
 
             baseSelectQuery = "SELECT id FROM lists WHERE name = ? and parent_id"
+
+
+rangeToSqlOr :: String -> [Range Integer] -> String
+rangeToSqlOr alias = intercalate " OR " . toSqlHelper
+   where
+      toSqlHelper :: [Range Integer] -> [String]
+      toSqlHelper [] = []
+      toSqlHelper (SpanRange x y:xs) = 
+         ("(" ++ show x ++ " <= " ++ identName ++ " AND " ++ identName ++ " <= " ++ show y ++ ")") 
+         : toSqlHelper xs
+      toSqlHelper (SingletonRange x:xs) = 
+         (show x ++ " = " ++ identName) 
+         : toSqlHelper xs
+
+      identName = 
+         case alias of
+            [] -> "id"
+            _ -> alias ++ ".id"
