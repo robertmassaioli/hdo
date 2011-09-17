@@ -7,6 +7,7 @@ import TodoArguments
 import Configuration
 import Util
 
+import Data.List (intersperse)
 import Data.Maybe (catMaybes)
 import Control.Monad.Trans.Maybe (runMaybeT)
 import Control.Monad (unless)
@@ -34,9 +35,9 @@ executeRenameCommand config command@(Rename {}) =
                      run conn (updateItems fromIds) [toSql toId]
                      cleanOldLists conn fromIds
                      putStr "Successfully renamed: "
-                     putStr . show $ fromIds
+                     putStr . concat . intersperse " " . fromListPath $ command
                      putStr " => "
-                     print toId
+                     putStrLn . toListPath $ command
                commit conn
                disconnect conn
    where
