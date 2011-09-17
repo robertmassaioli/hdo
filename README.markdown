@@ -31,41 +31,41 @@ And it will print out all of your options. From there it should be pretty obviou
 
 However, if you still need a basic use case here is an example of using the most common features:
 
-   $ htodo init
-   $ htodo add
-   comment> Add all of the computer parts to their own sub-todo list.
-   priority> 4
-   tags> 
-   $ htodo add computer/parts
-   comment> Buy some ram
-   priority> 1
-   tags> computer-part
-   $ htodo add computer/parts
-   comment> Buy a new hard drive.
-   priority> 5
-   tags> computer-part
-   $ htodo show
-   Main:
-      1. Add all of the computer parts ot their own sub-todo list.
-
-   computer:
-      parts:
-         2. Buy some ram
-         3. Buy a new hard drive.
-   $ htodo edit 2
-   comment> Buy some really fast ram.
-   priority> 1
-   tags> computer-part
-   $ htodo done 1
-   comment> This task has been completed.
-   $ htodo show
-   Main:
-
-   computer:
-      parts:
-         2. Buy some really fast ram.
-         3. Buy a new hard drive.
-   $
+    $ htodo init
+    $ htodo add
+    comment> Add all of the computer parts to their own sub-todo list.
+    priority> 4
+    tags> 
+    $ htodo add computer/parts
+    comment> Buy some ram
+    priority> 1
+    tags> computer-part
+    $ htodo add computer/parts
+    comment> Buy a new hard drive.
+    priority> 5
+    tags> computer-part
+    $ htodo show
+    Main:
+       1. Add all of the computer parts ot their own sub-todo list.
+     
+    computer:
+       parts:
+          2. Buy some ram
+          3. Buy a new hard drive.
+    $ htodo edit 2
+    comment> Buy some really fast ram.
+    priority> 1
+    tags> computer-part
+    $ htodo done 1
+    comment> This task has been completed.
+    $ htodo show
+    Main:
+    
+    computer:
+       parts:
+          2. Buy some really fast ram.
+          3. Buy a new hard drive.
+    $
 
 This use case should guide you through many of the common operations and make you feel confident that everything will "just work" the way that it should.
 
