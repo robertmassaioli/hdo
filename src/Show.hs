@@ -22,7 +22,6 @@ executeShowCommand config showFlags = do
       Just conn -> do
          unless (filter_str == "") $ print (getFilters filter_str)
          case showUsingTags showFlags of
-            --Nothing -> getTodoItems conn (generateQuery []) >>= displayItems maxId
             Nothing -> getTodoLists conn >>= sequence_ . intersperse putNewline . fmap (displayList 0)
             Just x -> case separateCommas x of
                         Nothing -> putStrLn "Invalid text was placed in the tags."
@@ -68,12 +67,15 @@ displayList :: Int -> List -> IO ()
 displayList indentLevel list = do
    putStr indentSpace
    putStrLn $ listName list ++ ":"
-   unless (null . listItems $ list) $ do
+   unless noItems $ do
       mapM_ displayItem (listItems list)
-      unless (null theChildren) putNewline
-   unless (null theChildren) $
+      unless noChildren putNewline
+   unless noChildren $
       sequence_ . intersperse putNewline . fmap (displayList $ indentLevel + 1) $ theChildren
    where
+      noItems = null . listItems $ list
+      noChildren = null theChildren
+
       itemIndentSpace = replicate (spacesPerIndent * (indentLevel + 1)) ' '
       indentSpace = replicate (spacesPerIndent * indentLevel) ' '
       spacesPerIndent = 3

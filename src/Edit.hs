@@ -28,11 +28,15 @@ executeEditCommand config editCommand = do
          commit conn
          disconnect conn
       where
+         -- TODO The edit command needs to deal with every specified item therefore maybe run only
+         -- one query to the database to get all of the required pieces of information. You can
+         -- still save everything back seperately.
          getEditRanges :: String -> [Integer]
          getEditRanges input = case parse (parseRanges ',') "(edit_ranges)" input of
                                  Left _ -> []
                                  Right x -> fromMergedRanges x
 
+         -- TODO Turn this into an EitherT instance
          editSingleId :: (IConnection c) => c -> Integer -> IO ()
          editSingleId conn id = do
             putStrLn $ "Now editing item: " ++ show id
@@ -40,7 +44,7 @@ executeEditCommand config editCommand = do
             case d of
                Nothing -> putStrLn $ "Could not find data for id: " ++ show id
                Just oldData@(oldDesc,_,oldTags) -> do 
-                  newData <- runInputT defaultSettings (runMaybeT (askEditQuestions oldData))
+                  newData <- runInputT defaultSettings $ runMaybeT (askEditQuestions oldData)
                   case newData of
                      Nothing -> putStrLn "Invalid input or early termination."
                      Just (desc, pri, tags) -> do 
