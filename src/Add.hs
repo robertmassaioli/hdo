@@ -51,9 +51,7 @@ executeAddCommand config addFlags = do
                Just description <- lift $ getInputLine "comment> "
                guard (not $ null description)
 
-               Just pri <- lift $ case priority addCommand of
-                  Nothing -> getInputLine "priority> "
-                  Just pri -> getInputLineWithInitial "priority> " (show pri, "")
+               Just pri <- lift $ getInputLineWithInitial "priority> " (maybe "5" show (priority addCommand), "")
                guard (not $ null pri)
 
                Just tags <- lift $ getInputLine "tags> "
