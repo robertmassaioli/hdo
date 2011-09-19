@@ -13,6 +13,7 @@ data List = List
 data Item = Item
    { itemId :: Integer
    , itemDescription :: String
+   , itemCurrentState :: ItemState
    , itemCreatedAt :: LocalTime
    , itemDueDate :: Maybe LocalTime
    , itemPriority :: Integer

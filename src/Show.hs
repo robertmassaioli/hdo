@@ -20,9 +20,10 @@ executeShowCommand config showFlags = do
    case mconn of
       Nothing -> gracefulExit
       Just conn -> do
-         unless (filter_str == "") $ print (getFilters filter_str)
+         -- TODO Actually use these filter strings.
+         --unless (filter_str == "") $ print (getFilters filter_str)
          case showUsingTags showFlags of
-            Nothing -> getTodoLists conn >>= sequence_ . intersperse putNewline . fmap (displayList 0)
+            Nothing -> getTodoLists showFlags conn >>= sequence_ . intersperse putNewline . fmap (displayList 0)
             Just x -> case separateCommas x of
                         Nothing -> putStrLn "Invalid text was placed in the tags."
                         Just x -> print "Not implemented yet"
@@ -30,22 +31,18 @@ executeShowCommand config showFlags = do
    where
       filter_str = intercalate "," . catMaybes $ [showUsingFilter showFlags, showFilterExtra showFlags]
 
-      generateQuery :: [String] -> String
-      generateQuery [] = "SELECT i.* FROM items i where i.current_state < ? "
-      generateQuery xs = queryLeft ++ " AND (" ++ createOrList "t.tag_name =" xs ++ ")"
-
-      queryLeft = "SELECT i.* FROM items i, tags t, tag_map tm where i.id = tm.item_id AND tm.tag_id = t.id AND i.current_state < ?"
-
-getTodoLists :: (IConnection c) => c -> IO [List]
-getTodoLists conn = do
+getTodoLists :: (IConnection c) => TodoCommand -> c -> IO [List]
+getTodoLists showFlags conn = do
    topLevels <- quickQuery' conn "SELECT l.* FROM lists l where l.parent_id is null order by l.name, l.created_at" []
    mapM createChildList topLevels
    where
+      whichState = if showDone showFlags then StateDone else StateNotDone
+
       createChildList :: [SqlValue] -> IO List
       createChildList [lid, lname, lhidden, lcreatedAt, lparentId] = do
          children <- mapM createChildList =<< quickQuery' conn "SELECT l.* FROM lists l WHERE l.parent_id = ? order by l.name, l.created_at" [lid]
          maxItemId <- fmap (fromMaybe 1 . extractInteger) $ quickQuery' conn "SELECT max(i.id) FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id" [lid]
-         items <- mapM toItem =<< quickQuery' conn "SELECT i.* FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id AND i.current_state < ? ORDER BY i.priority, i.id" [lid, toSql . fromEnum $ StateDone]
+         items <- mapM toItem =<< quickQuery' conn "SELECT i.* FROM items i, lists l WHERE ? = l.id AND l.id = i.list_id AND i.current_state <= ? ORDER BY i.priority, i.id" [lid, toSql . fromEnum $ whichState]
          return List 
             { listName = fromSql lname
             , listMaxIdLen = fromInteger maxItemId
@@ -58,6 +55,7 @@ getTodoLists conn = do
                return Item 
                   { itemId = fromSql iId
                   , itemDescription = fromSql iDescription
+                  , itemCurrentState = toEnum . fromSql $ iCurrentState
                   , itemCreatedAt = fromSql iCreatedAt
                   , itemDueDate = fromSql iDueDate
                   , itemPriority = fromSql iPriority
@@ -84,11 +82,14 @@ displayList indentLevel list = do
 
       displayItem :: Item -> IO ()
       displayItem item = do
-         putStr $ itemIndentSpace ++ itemIdString ++ "." ++ extraSpaces
+         putStr $ itemIndentSpace
+         case itemCurrentState item of
+            StateDone   -> putStr "-"
+            _           -> return ()
+         putStr $ itemIdString ++ "." ++ extraSpaces
          putStrLn $ itemDescription item
          where
             extraSpaces :: String
             extraSpaces = replicate (1 + (length . show . listMaxIdLen $ list) - length itemIdString) ' '
 
             itemIdString = show $ itemId item
-
