@@ -8,7 +8,7 @@ module TodoArguments (
 import System.Console.CmdArgs.Implicit
 
 data TodoCommand 
-            = Show
+            = Show 
                { userLevel :: Bool
                , showEntireHierarchy :: Bool
                , showDone :: Bool
@@ -23,7 +23,7 @@ data TodoCommand
                }
             | Add 
                { userLevel :: Bool
-               , fromFile :: Maybe FilePath 
+               , fromFile :: Maybe FilePath     -- Not Implemented Yet
                , priority :: Maybe Integer
                , databaseFile :: Maybe FilePath
                , listPath :: Maybe String
