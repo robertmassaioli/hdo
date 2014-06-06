@@ -3,7 +3,9 @@
 .*.swp
 
 # Compile dir
-dist
+/dist
+/.cabal-sandbox
+/cabal.sandbox.config
 
 # database files (will want to remove this eventually)
 *.db
