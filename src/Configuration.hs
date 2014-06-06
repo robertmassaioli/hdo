@@ -2,7 +2,7 @@ module Configuration
    ( Config(..)
    , defaultConfig
    , getDatabaseConnection
-   , findHTodoDatabase
+   , findHdoDatabase
    , defaultDatabaseLocation
    , hiddenFileName
    ) where
@@ -22,9 +22,9 @@ data Config = Config
 
 defaultConfig :: IO Config
 defaultConfig = do 
-   appDir <- getAppUserDataDirectory "htodo"
+   appDir <- getAppUserDataDirectory "hdo"
    return Config
-      { defaultDatabaseName = ".htodo.db"
+      { defaultDatabaseName = ".hdo.db"
       , defaultAppDirectory = appDir
       }
 
@@ -32,9 +32,9 @@ getDatabaseConnection :: Config -> TodoCommand -> IO (Maybe Connection)
 getDatabaseConnection config command = do
    path <- if userLevel command
                then findHomeDatabase
-               else findHTodoDatabase config 
+               else findHdoDatabase config 
    case path of
-      Nothing -> putStrLn "Could not find hTodo database in path. Maybe you should try 'htodo init' to start a new todo in the current directory?" >> return Nothing
+      Nothing -> putStrLn "Could not find hDo database in path. Maybe you should try 'hdo init' to start a new todo in the current directory?" >> return Nothing
       Just validPath -> do
          putStrLn $ "Using database: " ++ validPath
          putNewline
@@ -43,8 +43,8 @@ getDatabaseConnection config command = do
       findHomeDatabase :: IO (Maybe FilePath)
       findHomeDatabase = searchPathForFile config []
 
-findHTodoDatabase :: Config -> IO (Maybe FilePath)
-findHTodoDatabase config = do
+findHdoDatabase :: Config -> IO (Maybe FilePath)
+findHdoDatabase config = do
    current <- getCurrentDirectory
    home <- getHomeDirectory
    searchPathForFile config $ generateSearchPath home current

@@ -57,8 +57,8 @@ executeEditCommand config editCommand = do
                         getTagMapIds conn id (oldTags \\ tags) >>= mapM_ (deleteTagMapping ds id)
                         putStrLn $ "Successfully updated item " ++ show id ++ "."
                         -- please note that we intentionally do not delete tags here; just the
-                        -- mappings, we leave them around for later use. The 'htodo clean' or maybe
-                        -- 'htodo gc' command will do that cleanup I think.
+                        -- mappings, we leave them around for later use. The 'hdo clean' or maybe
+                        -- 'hdo gc' command will do that cleanup I think.
             where
                updateItem = "UPDATE items SET description = ?, priority = ? where id = ?"
 

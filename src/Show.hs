@@ -14,6 +14,7 @@ import TodoArguments
 import Configuration
 import Filter
 
+-- TODO use the MaybeT transformer
 executeShowCommand :: Config -> TodoCommand -> IO ()
 executeShowCommand config showFlags = do
    mconn <- getDatabaseConnection config showFlags

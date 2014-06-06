@@ -60,8 +60,8 @@ todoArguments = cmdArgsMode $
                combinedModes 
                &= help "The program who's to do list is to do your todo's." 
                &= helpArg [explicit, name "h", name "help"]
-               &= program "htodo" 
-               &= summary "htodo v0.1 - By Robert Massaioli"
+               &= program "hdo" 
+               &= summary "hdo v0.1 - By Robert Massaioli"
 
 combinedModes :: TodoCommand
 combinedModes = modes 
@@ -115,7 +115,7 @@ showMode = Show
             &= help "Show todo items from the database."
             &= details
             [ "You are eventually going to want to display items from the database and this is what will "
-            ++ "allow you to do exactly that. This is the default mode that htodo runs in."
+            ++ "allow you to do exactly that. This is the default mode that hdo runs in."
             ]
 
 initMode :: TodoCommand
@@ -166,7 +166,7 @@ addMode = Add
             ++ "line, or you could be using grep to get them out of your source code or you could even be "
             ++ "getting them from some file you just had lying around or that you quickly jotted down while "
             ++ "you were away from your computer and the internet. The possibilities are endless."
-            , "But either way this should allow you to add items, irrecspective of their source, to your htodo "
+            , "But either way this should allow you to add items, irrecspective of their source, to your hdo "
             ++ "database."
             ]
 
