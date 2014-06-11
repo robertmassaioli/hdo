@@ -62,8 +62,14 @@ getTodoLists showFlags conn = do
                   , itemPriority = fromSql iPriority
                   }
 
+hasItems :: List -> Bool
+hasItems currentList = haveItems || childrenHaveItems
+   where
+      haveItems = not . null . listItems $ currentList
+      childrenHaveItems = any hasItems (childLists currentList)
+
 displayList :: Int -> List -> IO ()
-displayList indentLevel list = do
+displayList indentLevel list = when (hasItems list) $ do
    putStr indentSpace
    putStrLn $ listName list ++ ":"
    unless noItems $ do

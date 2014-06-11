@@ -27,7 +27,6 @@ executeAddCommand config addFlags = do
             Nothing -> putStrLn "Need a comment and priority to add a new item, or reacting to early termination."
             Just (comment, pri, tags) -> do
                listId <- getOrCreateListId conn (listPath addFlags)
-               putStrLn $ "List id: " ++ show listId
 
                run conn addInsertion [toSql listId, toSql comment, toSql $ fromEnum StateNotDone, toSql pri]
                itemId <- getLastId conn
