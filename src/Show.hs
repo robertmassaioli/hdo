@@ -24,7 +24,7 @@ executeShowCommand config showFlags = do
          -- TODO Actually use these filter strings.
          --unless (filter_str == "") $ print (getFilters filter_str)
          case showUsingTags showFlags of
-            Nothing -> getTodoLists showFlags conn >>= sequence_ . intersperse putNewline . fmap (displayList 0)
+            Nothing -> getTodoLists showFlags conn >>= displayLists
             Just x -> case separateCommas x of
                         Nothing -> putStrLn "Invalid text was placed in the tags."
                         Just x -> print "Not implemented yet"
@@ -67,6 +67,9 @@ hasItems currentList = haveItems || childrenHaveItems
    where
       haveItems = not . null . listItems $ currentList
       childrenHaveItems = any hasItems (childLists currentList)
+
+displayLists :: [List] -> IO ()
+displayLists = sequence_ . intersperse putNewline . fmap (displayList 0) . filter hasItems
 
 displayList :: Int -> List -> IO ()
 displayList indentLevel list = when (hasItems list) $ do
